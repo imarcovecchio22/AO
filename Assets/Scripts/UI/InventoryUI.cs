@@ -249,8 +249,182 @@ namespace ArgentumOnline.UI
         {
             var slot = GameState.Instance.LocalPlayer.Inventory[idx];
             if (slot.IdItem == 0) return;
-            // TODO: mostrar detalle / usar item
-            Debug.Log($"[Inv] Slot {idx}: {slot.Name} x{slot.Cantidad} — equipado:{slot.Equipped}");
+            ShowItemPopup(idx, slot);
+        }
+
+        // ── Popup de ítem ─────────────────────────────────────────────────────
+
+        private GameObject _popup;
+
+        private void ShowItemPopup(int idx, InventorySlot slot)
+        {
+            ClosePopup();
+
+            // Fondo oscuro que cierra al tocar fuera
+            _popup = Rect("ItemPopup", _panel.transform,
+                          Vector2.zero, Vector2.one,
+                          new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            var blocker = _popup.AddComponent<Image>();
+            blocker.color = new Color(0, 0, 0, 0.45f);
+            var blkBtn = _popup.AddComponent<Button>();
+            blkBtn.transition = Selectable.Transition.None;
+            blkBtn.onClick.AddListener(ClosePopup);
+
+            // Panel del popup
+            float pw = 320f, ph = 220f;
+            var card = Rect("Card", _popup.transform,
+                            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                            new Vector2(0.5f, 0.5f), Vector2.zero,
+                            new Vector2(pw, ph));
+            var cardImg = card.AddComponent<Image>();
+            cardImg.color = new Color(0.08f, 0.06f, 0.03f, 0.98f);
+            card.AddComponent<Shadow>().effectColor = new Color(0, 0, 0, 0.85f);
+
+            // Evitar que clicks en la card cierren el popup
+            var cardBtn = card.AddComponent<Button>();
+            cardBtn.transition = Selectable.Transition.None;
+            cardBtn.onClick.AddListener(() => { });
+
+            // Nombre
+            var nameGo = Rect("Name", card.transform,
+                              new Vector2(0, 1), new Vector2(1, 1),
+                              new Vector2(0.5f, 1), new Vector2(0, -10),
+                              new Vector2(-20, 30));
+            var nameTxt = nameGo.AddComponent<Text>();
+            nameTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            nameTxt.text      = slot.Name;
+            nameTxt.fontSize  = 20;
+            nameTxt.fontStyle = FontStyle.Bold;
+            nameTxt.color     = Gold;
+            nameTxt.alignment = TextAnchor.MiddleCenter;
+            nameGo.AddComponent<Shadow>().effectColor = new Color(0, 0, 0, 0.9f);
+
+            // Stats (DataObj)
+            float statY = -48f;
+            if (!string.IsNullOrEmpty(slot.DataObj))
+            {
+                var statGo = Rect("Stats", card.transform,
+                                  new Vector2(0, 1), new Vector2(1, 1),
+                                  new Vector2(0.5f, 1), new Vector2(0, statY),
+                                  new Vector2(-20, 26));
+                var statTxt = statGo.AddComponent<Text>();
+                statTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                statTxt.text      = slot.DataObj;
+                statTxt.fontSize  = 15;
+                statTxt.color     = new Color(0.85f, 0.85f, 0.75f, 1f);
+                statTxt.alignment = TextAnchor.MiddleCenter;
+                statY -= 30f;
+            }
+
+            // Cantidad y valor
+            string infoStr = slot.Cantidad > 1 ? $"Cantidad: {slot.Cantidad}   " : "";
+            infoStr += $"Valor: {slot.Valor} oro";
+            var infoGo = Rect("Info", card.transform,
+                              new Vector2(0, 1), new Vector2(1, 1),
+                              new Vector2(0.5f, 1), new Vector2(0, statY),
+                              new Vector2(-20, 22));
+            var infoTxt = infoGo.AddComponent<Text>();
+            infoTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            infoTxt.text      = infoStr;
+            infoTxt.fontSize  = 13;
+            infoTxt.color     = new Color(0.70f, 0.65f, 0.50f, 1f);
+            infoTxt.alignment = TextAnchor.MiddleCenter;
+
+            // Botones de acción
+            float btnY = -ph / 2 + 50f;
+            bool isEquippable = slot.ObjType >= 1 && slot.ObjType <= 5;
+
+            if (isEquippable)
+            {
+                string label = slot.Equipped ? "Desequipar" : "Equipar";
+                AddPopupButton(card.transform, label, -84f, btnY, () =>
+                {
+                    Network.NetworkManager.Instance.Send(
+                        Network.PacketSerializer.Instance.EquipItem(slot.IdPos));
+                    ClosePopup();
+                });
+            }
+            else
+            {
+                AddPopupButton(card.transform, "Usar", -84f, btnY, () =>
+                {
+                    Network.NetworkManager.Instance.Send(
+                        Network.PacketSerializer.Instance.UseItem(slot.IdPos));
+                    ClosePopup();
+                });
+            }
+
+            AddPopupButton(card.transform, "Tirar", 84f, btnY, () =>
+            {
+                ShowDropConfirm(idx, slot);
+            });
+
+            // × cerrar
+            var xGo = Rect("X", card.transform,
+                           new Vector2(1, 1), new Vector2(1, 1),
+                           new Vector2(1, 1), new Vector2(-6, -6),
+                           new Vector2(32, 32));
+            var xImg = xGo.AddComponent<Image>();
+            xImg.color = new Color(0.5f, 0.1f, 0.08f, 0.9f);
+            var xBtn = xGo.AddComponent<Button>();
+            xBtn.transition = Selectable.Transition.None;
+            xBtn.onClick.AddListener(ClosePopup);
+            var xTxt = Rect("T", xGo.transform, Vector2.zero, Vector2.one,
+                            new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero)
+                .AddComponent<Text>();
+            xTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            xTxt.text      = "✕";
+            xTxt.fontSize  = 18;
+            xTxt.color     = Color.white;
+            xTxt.alignment = TextAnchor.MiddleCenter;
+        }
+
+        private void ShowDropConfirm(int idx, InventorySlot slot)
+        {
+            ClosePopup();
+            if (slot.Cantidad <= 1)
+            {
+                Network.NetworkManager.Instance.Send(
+                    Network.PacketSerializer.Instance.TirarItem(slot.IdPos, 1));
+                return;
+            }
+
+            // Para stacks: confirmar con cantidad máxima por simplicidad
+            // TODO: agregar input de cantidad
+            Network.NetworkManager.Instance.Send(
+                Network.PacketSerializer.Instance.TirarItem(slot.IdPos, slot.Cantidad));
+        }
+
+        private void AddPopupButton(Transform parent, string label, float x, float y, UnityEngine.Events.UnityAction action)
+        {
+            var go = Rect(label, parent,
+                          new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                          new Vector2(0.5f, 0.5f), new Vector2(x, y),
+                          new Vector2(140f, 44f));
+            var img = go.AddComponent<Image>();
+            img.color = new Color(0.22f, 0.16f, 0.06f, 1f);
+            go.AddComponent<Shadow>().effectColor = new Color(0, 0, 0, 0.7f);
+            var btn = go.AddComponent<Button>();
+            btn.transition = Selectable.Transition.ColorTint;
+            var colors = btn.colors;
+            colors.highlightedColor = new Color(0.35f, 0.26f, 0.10f, 1f);
+            colors.pressedColor     = new Color(0.45f, 0.34f, 0.12f, 1f);
+            btn.colors = colors;
+            btn.onClick.AddListener(action);
+            var txt = Rect("T", go.transform, Vector2.zero, Vector2.one,
+                           new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero)
+                .AddComponent<Text>();
+            txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.text      = label;
+            txt.fontSize  = 17;
+            txt.fontStyle = FontStyle.Bold;
+            txt.color     = Gold;
+            txt.alignment = TextAnchor.MiddleCenter;
+        }
+
+        private void ClosePopup()
+        {
+            if (_popup != null) { Destroy(_popup); _popup = null; }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
