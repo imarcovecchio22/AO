@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using ArgentumOnline.Game;
@@ -27,12 +26,12 @@ namespace ArgentumOnline.Renderer
         // Pool de SpriteRenderers por capa
         private readonly Dictionary<string, List<SpriteRenderer>> _pool =
             new Dictionary<string, List<SpriteRenderer>>();
-        private readonly string[] _layers = { "1", "2", "3", "4" };
+        private readonly string[] _layers    = { "1", "2", "3", "4" };
         private readonly int[]    _sortOrders = { 0, 1, 2, 10 };
 
-        private MapGrid   _currentMap;
-        private int       _lastCenterX = -1;
-        private int       _lastCenterY = -1;
+        private MapGrid _currentMap;
+        private int     _lastCenterX = -1;
+        private int     _lastCenterY = -1;
 
         void Awake() => Instance = this;
 
@@ -46,8 +45,7 @@ namespace ArgentumOnline.Renderer
         }
 
         /// <summary>
-        /// Llamar cada frame (o cuando el jugador se mueve) con la posición actual.
-        /// Solo redibuja si el tile central cambió.
+        /// Llamar cuando el jugador se mueve. Solo redibuja si el tile central cambió.
         /// </summary>
         public void UpdateViewport(int centerX, int centerY)
         {
@@ -57,12 +55,12 @@ namespace ArgentumOnline.Renderer
             _lastCenterX = centerX;
             _lastCenterY = centerY;
 
-            StartCoroutine(RenderViewport(centerX, centerY));
+            RenderViewport(centerX, centerY);
         }
 
         // ── Render ────────────────────────────────────────────────────────────
 
-        private IEnumerator RenderViewport(int centerX, int centerY)
+        private void RenderViewport(int centerX, int centerY)
         {
             // Ocultar todos los renderers del pool
             foreach (var layer in _layers)
@@ -81,8 +79,6 @@ namespace ArgentumOnline.Renderer
                     var cell = _currentMap.GetCell(mapX, mapY);
                     if (cell == null) continue;
 
-                    // Posición en mundo Unity. Pivot centro → multiplicar por tileSize directo.
-                    // Y invertido: mapa Y crece hacia abajo, Unity Y crece hacia arriba.
                     float worldX =  dx * tileSize;
                     float worldY = -dy * tileSize;
 
@@ -97,7 +93,6 @@ namespace ArgentumOnline.Renderer
                         sr.transform.localPosition = new Vector3(worldX, worldY, 0);
                         sr.enabled = true;
 
-                        // Cargar sprite async
                         int capturedGrh = grhIndex;
                         SpriteRenderer capturedSr = sr;
                         GrhDatabase.Instance.GetSprite(capturedGrh, sprite =>
@@ -105,9 +100,6 @@ namespace ArgentumOnline.Renderer
                             if (capturedSr != null && sprite != null)
                             {
                                 capturedSr.sprite = sprite;
-                                // Siempre mostrar en 1x1 tile (32px = 1 unidad)
-                                // El sprite tiene 32 PPU → su tamaño natural en Unity es width/32 unidades
-                                // Para forzar 1x1: escala = 32/width, 32/height
                                 float scaleX = 32f / sprite.rect.width;
                                 float scaleY = 32f / sprite.rect.height;
                                 capturedSr.transform.localScale = new Vector3(scaleX, scaleY, 1);
@@ -116,8 +108,6 @@ namespace ArgentumOnline.Renderer
                     }
                     poolIdx++;
                 }
-
-                yield return null; // distribuir el trabajo en varios frames
             }
         }
 
@@ -140,7 +130,6 @@ namespace ArgentumOnline.Renderer
             if (index < list.Count)
                 return list[index];
 
-            // Crear nuevo renderer
             var go = new GameObject($"Tile_{layer}_{index}");
             go.transform.SetParent(transform);
             var sr = go.AddComponent<SpriteRenderer>();

@@ -1,0 +1,128 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using ArgentumOnline.Network;
+using ArgentumOnline.Game;
+
+namespace ArgentumOnline.Input
+{
+    /// <summary>
+    /// Escucha el joystick virtual y envía packets de Walk al servidor.
+    /// El movimiento real se aplica cuando el servidor responde con EntityMove.
+    /// También soporta teclado (WASD / flechas) para testear en editor.
+    /// </summary>
+    public class PlayerController : MonoBehaviour
+    {
+        public static PlayerController Instance { get; private set; }
+
+        [Tooltip("Tiempo mínimo entre moves (ms) para no spamear")]
+        [SerializeField] private float _moveIntervalSec = 0.15f;
+
+        private float _lastMoveSent = -999f;
+        private bool  _moving       = false;
+        private VirtualJoystick.JoyDir _heldDir = VirtualJoystick.JoyDir.None;
+
+        private bool _joystickSubscribed = false;
+
+        void Awake() => Instance = this;
+
+        void OnDestroy()
+        {
+            if (VirtualJoystick.Instance != null)
+                VirtualJoystick.Instance.OnDirectionChanged -= OnJoyDir;
+        }
+
+        // ── Joystick ──────────────────────────────────────────────────────────
+
+        private void OnJoyDir(VirtualJoystick.JoyDir dir)
+        {
+            _heldDir = dir;
+
+            if (dir == VirtualJoystick.JoyDir.None)
+            {
+                _moving = false;
+            }
+            else
+            {
+                if (!_moving)
+                {
+                    _moving = true;
+                    StartCoroutine(MoveLoop());
+                }
+            }
+        }
+
+        private IEnumerator MoveLoop()
+        {
+            while (_moving && _heldDir != VirtualJoystick.JoyDir.None)
+            {
+                SendMove(_heldDir);
+                yield return new WaitForSeconds(_moveIntervalSec);
+            }
+            _moving = false;
+        }
+
+        // ── Teclado (editor / debug) ──────────────────────────────────────────
+
+        void Update()
+        {
+            // Suscribirse al joystick cuando esté disponible (se crea en runtime)
+            if (!_joystickSubscribed && VirtualJoystick.Instance != null)
+            {
+                VirtualJoystick.Instance.OnDirectionChanged += OnJoyDir;
+                _joystickSubscribed = true;
+            }
+
+            // Solo en editor o si no hay joystick
+            if (VirtualJoystick.Instance != null &&
+                VirtualJoystick.Instance.CurrentDir != VirtualJoystick.JoyDir.None)
+                return;
+
+            if (Time.time - _lastMoveSent < _moveIntervalSec) return;
+
+            var kb = Keyboard.current;
+            if (kb == null) return;
+
+            if (kb.wKey.isPressed || kb.upArrowKey.isPressed)
+                SendMove(VirtualJoystick.JoyDir.Up);
+            else if (kb.sKey.isPressed || kb.downArrowKey.isPressed)
+                SendMove(VirtualJoystick.JoyDir.Down);
+            else if (kb.aKey.isPressed || kb.leftArrowKey.isPressed)
+                SendMove(VirtualJoystick.JoyDir.Left);
+            else if (kb.dKey.isPressed || kb.rightArrowKey.isPressed)
+                SendMove(VirtualJoystick.JoyDir.Right);
+        }
+
+        // ── Envío al servidor ─────────────────────────────────────────────────
+
+        private void SendMove(VirtualJoystick.JoyDir dir)
+        {
+            if (!NetworkManager.Instance.IsConnected) return;
+
+            _lastMoveSent = Time.time;
+
+            var heading = dir switch
+            {
+                VirtualJoystick.JoyDir.Up    => Heading.Up,
+                VirtualJoystick.JoyDir.Down  => Heading.Down,
+                VirtualJoystick.JoyDir.Right => Heading.Right,
+                VirtualJoystick.JoyDir.Left  => Heading.Left,
+                _                            => Heading.Down
+            };
+
+            // Predicción client-side: mover inmediatamente sin esperar al servidor
+            var p = GameState.Instance.LocalPlayer;
+            p.Heading = (byte)heading;
+            switch (heading)
+            {
+                case Heading.Up:    p.PosY--; break;
+                case Heading.Down:  p.PosY++; break;
+                case Heading.Right: p.PosX++; break;
+                case Heading.Left:  p.PosX--; break;
+            }
+            p.NotifyPositionChanged();
+
+            NetworkManager.Instance.Send(PacketSerializer.Instance.Position(heading));
+        }
+    }
+}

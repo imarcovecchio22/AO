@@ -116,6 +116,8 @@ namespace ArgentumOnline.Network
 
         // ── Envío ────────────────────────────────────────────────────────────
 
+        public bool IsConnected => _ws != null && _ws.State == WebSocketState.Open;
+
         public async void Send(byte[] data)
         {
             if (_ws != null && _ws.State == WebSocketState.Open)
