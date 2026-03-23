@@ -20,8 +20,12 @@ namespace ArgentumOnline.Renderer
         public static MapRenderer Instance { get; private set; }
 
         [Header("Configuración")]
-        [SerializeField] private int viewportRadius = 9;   // 9 = 19x19 tiles visibles
-        [SerializeField] private float tileSize     = 1f;  // 1 unidad Unity = 1 tile
+        [SerializeField] private int   viewportRadius  = 9;    // 9 = 19x19 tiles visibles
+        [SerializeField] private float tileSize        = 1f;   // 1 unidad Unity = 1 tile
+
+        [Header("Offset capas 3/4 (paredes y techos)")]
+        [SerializeField] private float overlayOffsetX  = 0.4f;
+        [SerializeField] private float overlayOffsetY  = -1.3f;
 
         public int ViewportRadius => viewportRadius;
 
@@ -64,53 +68,66 @@ namespace ArgentumOnline.Renderer
 
         private void RenderViewport(int centerX, int centerY)
         {
-            // Ocultar todos los renderers del pool
             foreach (var layer in _layers)
                 foreach (var sr in GetPool(layer))
                     sr.enabled = false;
 
-            int poolIdx = 0;
+            int poolIdx      = 0;
+            int renderRadius = viewportRadius + 1;
 
-            int renderRadius = viewportRadius + 1; // +1 tile de buffer en los bordes
-        for (int dy = -renderRadius; dy <= renderRadius; dy++)
+            for (int dy = -renderRadius; dy <= renderRadius; dy++)
+            for (int dx = -renderRadius; dx <= renderRadius; dx++)
             {
-                for (int dx = -renderRadius; dx <= renderRadius; dx++)
+                int mapX = centerX + dx;
+                int mapY = centerY + dy;
+
+                var cell = _currentMap.GetCell(mapX, mapY);
+                if (cell == null) { poolIdx++; continue; }
+
+                for (int li = 0; li < _layers.Length; li++)
                 {
-                    int mapX = centerX + dx;
-                    int mapY = centerY + dy;
+                    string layerKey = _layers[li];
+                    if (!cell.graphics.TryGetValue(layerKey, out int grhIndex) || grhIndex <= 0)
+                        continue;
 
-                    var cell = _currentMap.GetCell(mapX, mapY);
-                    if (cell == null) continue;
+                    var sr = GetPooledRenderer(layerKey, poolIdx);
+                    sr.sortingOrder = _sortOrders[li];
+                    sr.enabled      = true;
 
-                    float worldX =  dx * tileSize;
-                    float worldY = -dy * tileSize;
-
-                    for (int li = 0; li < _layers.Length; li++)
+                    int            capturedGrh = grhIndex;
+                    SpriteRenderer capturedSr  = sr;
+                    float          capturedDx  = dx * tileSize;
+                    float          capturedDy  = dy * tileSize;
+                    bool           isOverlay   = li >= 2;   // layer "3" o "4"
+                    GrhDatabase.Instance.GetSprite(capturedGrh, sprite =>
                     {
-                        string layerKey = _layers[li];
-                        if (!cell.graphics.TryGetValue(layerKey, out int grhIndex)) continue;
-                        if (grhIndex <= 0) continue;
+                        if (capturedSr == null) return;
+                        if (sprite == null) { capturedSr.enabled = false; return; }
+                        capturedSr.sprite               = sprite;
+                        capturedSr.transform.localScale = Vector3.one;
 
-                        var sr = GetPooledRenderer(layerKey, poolIdx);
-                        sr.sortingOrder = _sortOrders[li];
-                        sr.transform.localPosition = new Vector3(worldX, worldY, 0);
-                        sr.enabled = true;
-
-                        int capturedGrh = grhIndex;
-                        SpriteRenderer capturedSr = sr;
-                        GrhDatabase.Instance.GetSprite(capturedGrh, sprite =>
+                        float w = sprite.rect.width  / 32f;
+                        float h = sprite.rect.height / 32f;
+                        float posX, posY;
+                        if (isOverlay)
                         {
-                            if (capturedSr != null && sprite != null)
-                            {
-                                capturedSr.sprite = sprite;
-                                float scaleX = 32f / sprite.rect.width;
-                                float scaleY = 32f / sprite.rect.height;
-                                capturedSr.transform.localScale = new Vector3(scaleX, scaleY, 1);
-                            }
-                        });
-                    }
-                    poolIdx++;
+                            // El cliente web dibuja capas 3/4 desplazadas +2 tiles al SE
+                            // respecto a la capa 1 en la misma posición de mapa:
+                            //   X = ScreenX*32 - W/2 + 48  → centro siempre en dx+2
+                            //   Y = ScreenY*32 - H  + 64   → centro en -dy - 2.5 + h/2
+                            posX = capturedDx + overlayOffsetX;
+                            posY = -capturedDy + overlayOffsetY + h * 0.5f;
+                        }
+                        else
+                        {
+                            // Capas 1/2: top-left del sprite en top-left del tile
+                            posX = capturedDx - 0.5f + w * 0.5f;
+                            posY = -capturedDy + 0.5f - h * 0.5f;
+                        }
+                        capturedSr.transform.localPosition = new Vector3(posX, posY, 0);
+                    });
                 }
+                poolIdx++;
             }
         }
 
