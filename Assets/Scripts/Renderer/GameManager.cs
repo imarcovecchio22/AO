@@ -34,8 +34,9 @@ namespace ArgentumOnline.Renderer
                 IdChar      = idChar
             };
 
-            // 2. Inicializar GrhDatabase
+            // 2. Inicializar bases de datos de assets
             yield return StartCoroutine(GrhDatabase.Instance.Initialize());
+            yield return StartCoroutine(EntityDatabase.Instance.Initialize());
 
             // 3. Conectar al servidor
             GameState.Instance.OnConnected += OnConnected;
@@ -57,12 +58,13 @@ namespace ArgentumOnline.Renderer
 
             MapRenderer.Instance.SetMap(map);
 
-            // 4. Arrancar el loop de render
+            // 4. Arrancar render del mapa
             var p = GameState.Instance.LocalPlayer;
             MapRenderer.Instance.UpdateViewport(p.PosX, p.PosY);
-
-            // Suscribirse a cambios de posición del jugador
             p.OnPositionChanged += OnPlayerMoved;
+
+            // 5. Inicializar renderer de entidades
+            EntityRenderer.Instance.Initialize();
 
             Debug.Log($"[GM] Mapa {map.MapNumber} listo — renderizando viewport");
         }
