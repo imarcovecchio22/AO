@@ -21,7 +21,7 @@ namespace ArgentumOnline.UI
             var canvasGo = new GameObject("TopBarCanvas");
             var canvas   = canvasGo.AddComponent<Canvas>();
             canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 6;
+            canvas.sortingOrder = 15;
             var scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1080, 1920);
