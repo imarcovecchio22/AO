@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.EventSystems;
 using ArgentumOnline.Network;
 using ArgentumOnline.Game;
 
@@ -73,6 +74,9 @@ namespace ArgentumOnline.Input
                 _joystickSubscribed = true;
             }
 
+            // Click/tap: siempre activo (independiente del joystick)
+            HandleClick();
+
             // Solo en editor o si no hay joystick
             if (VirtualJoystick.Instance != null &&
                 VirtualJoystick.Instance.CurrentDir != VirtualJoystick.JoyDir.None)
@@ -91,6 +95,48 @@ namespace ArgentumOnline.Input
                 SendMove(VirtualJoystick.JoyDir.Left);
             else if (kb.dKey.isPressed || kb.rightArrowKey.isPressed)
                 SendMove(VirtualJoystick.JoyDir.Right);
+        }
+
+        // ── Click / tap para interactuar ──────────────────────────────────────
+
+        private void HandleClick()
+        {
+            Vector2 screenPos = Vector2.zero;
+            bool clicked = false;
+
+            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+            {
+                screenPos = Mouse.current.position.ReadValue();
+                clicked   = true;
+            }
+            else if (Touchscreen.current != null &&
+                     Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+            {
+                screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
+                clicked   = true;
+            }
+
+            if (!clicked) return;
+
+            // No disparar si el tap cayó sobre un elemento de UI
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+
+            SendClickAt(screenPos);
+        }
+
+        private void SendClickAt(Vector2 screenPos)
+        {
+            if (!NetworkManager.Instance.IsConnected) return;
+
+            // Convertir posición de pantalla → tile absoluto en el mapa
+            var world = Camera.main.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
+            var p  = GameState.Instance.LocalPlayer;
+            int dx = Mathf.RoundToInt(world.x);
+            int dy = Mathf.RoundToInt(-world.y);
+            int absX = Mathf.Clamp(p.PosX + dx, 1, 100);
+            int absY = Mathf.Clamp(p.PosY + dy, 1, 100);
+
+            NetworkManager.Instance.Send(PacketSerializer.Instance.Click((byte)absX, (byte)absY));
         }
 
         // ── Envío al servidor ─────────────────────────────────────────────────

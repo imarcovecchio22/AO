@@ -27,6 +27,9 @@ namespace ArgentumOnline.Renderer
         // Animación de caminata
         private Coroutine _walkAnim;
 
+        // Interpolación de movimiento
+        private Coroutine _moveCoroutine;
+
         // Estado actual
         public long   EntityId;
         public byte   Heading = 2;  // Down por defecto
@@ -176,11 +179,43 @@ namespace ArgentumOnline.Renderer
             }
         }
 
-        /// <summary>Mueve la vista a una posición en coordenadas de tile relativas al centro del viewport.</summary>
+        /// <summary>Mueve la vista instantáneamente (snap). Para recalcular posiciones relativas al jugador.</summary>
         public void SetTilePosition(int dx, int dy)
         {
+            if (_moveCoroutine != null) { StopCoroutine(_moveCoroutine); _moveCoroutine = null; }
             transform.localPosition = new Vector3(dx, -dy, 0);
-            // sortingOrder por Y: entidades más abajo en pantalla se dibujan encima
+            ApplySortOrder(dy);
+        }
+
+        /// <summary>Mueve la vista con interpolación suave desde la posición actual hasta (dx, dy).</summary>
+        public void SmoothMoveTo(int dx, int dy)
+        {
+            if (_moveCoroutine != null) StopCoroutine(_moveCoroutine);
+            _moveCoroutine = StartCoroutine(SmoothMoveRoutine(dx, dy));
+        }
+
+        private IEnumerator SmoothMoveRoutine(int dx, int dy)
+        {
+            Vector3 start   = transform.localPosition;
+            Vector3 target  = new Vector3(dx, -dy, 0);
+            float   elapsed = 0f;
+            const float duration = 0.22f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+                transform.localPosition = Vector3.Lerp(start, target, t);
+                yield return null;
+            }
+
+            transform.localPosition = target;
+            ApplySortOrder(dy);
+            _moveCoroutine = null;
+        }
+
+        private void ApplySortOrder(int dy)
+        {
             int yOrder = _sortBase + (50 - dy);
             BodyRenderer.sortingOrder   = yOrder;
             HeadRenderer.sortingOrder   = yOrder + 1;

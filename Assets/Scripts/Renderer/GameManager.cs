@@ -59,6 +59,8 @@ namespace ArgentumOnline.Renderer
             MapRenderer.Instance.UpdateViewport(p.PosX, p.PosY);
             p.OnPositionChanged += OnPlayerMoved;
 
+            ArgentumOnline.UI.MinimapUI.Instance?.SetMap(map);
+
             EntityRenderer.Instance.Initialize();
             GameState.Instance.OnTeleport += OnTeleport;
 
@@ -79,6 +81,7 @@ namespace ArgentumOnline.Renderer
                 if (loadedMap == null) { Debug.LogError($"[GM] Mapa {map} no encontrado"); return; }
                 MapRenderer.Instance.SetMap(loadedMap);
                 MapRenderer.Instance.UpdateViewport(posX, posY);
+                ArgentumOnline.UI.MinimapUI.Instance?.SetMap(loadedMap);
             }));
         }
     }

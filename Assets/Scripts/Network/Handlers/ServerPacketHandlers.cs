@@ -287,9 +287,31 @@ namespace ArgentumOnline.Network.Handlers
 
         public void OnPutBodyAndHeadDead(ByteBuffer buf)
         {
-            long id = buf.ReadId();
-            buf.ReadShort(); buf.ReadShort(); buf.ReadShort(); buf.ReadShort(); buf.ReadShort();
-            if (GS.TryGetEntity(id, out var e)) e.IsDead = true;
+            long   id       = buf.ReadId();
+            ushort idHead   = buf.ReadShort();
+            ushort idHelmet = buf.ReadShort();
+            ushort idWeapon = buf.ReadShort();
+            ushort idShield = buf.ReadShort();
+            ushort idBody   = buf.ReadShort();
+
+            var local = GS.LocalPlayer;
+            if (id == local.Id)
+            {
+                local.IdHead   = idHead;
+                local.IdBody   = idBody;
+                local.IdHelmet = idHelmet;
+                local.IdWeapon = idWeapon;
+                local.IdShield = idShield;
+                local.IsDead   = true;
+                ArgentumOnline.Renderer.EntityRenderer.Instance.RefreshLocalPlayerAppearance();
+            }
+            else if (GS.TryGetEntity(id, out var e))
+            {
+                e.IdHead = idHead; e.IdBody = idBody;
+                e.IdHelmet = idHelmet; e.IdWeapon = idWeapon; e.IdShield = idShield;
+                e.IsDead = true;
+                ArgentumOnline.Renderer.EntityRenderer.Instance.RefreshEntityView(id);
+            }
         }
 
         public void OnRevivirUsuario(ByteBuffer buf)
@@ -297,11 +319,21 @@ namespace ArgentumOnline.Network.Handlers
             long   id     = buf.ReadId();
             ushort idHead = buf.ReadShort();
             ushort idBody = buf.ReadShort();
-            if (GS.TryGetEntity(id, out var e))
+
+            var local = GS.LocalPlayer;
+            if (id == local.Id)
+            {
+                local.IdHead = idHead;
+                local.IdBody = idBody;
+                local.IsDead = false;
+                ArgentumOnline.Renderer.EntityRenderer.Instance.RefreshLocalPlayerAppearance();
+            }
+            else if (GS.TryGetEntity(id, out var e))
             {
                 e.IsDead = false;
                 e.IdHead = idHead;
                 e.IdBody = idBody;
+                ArgentumOnline.Renderer.EntityRenderer.Instance.RefreshEntityView(id);
             }
         }
 

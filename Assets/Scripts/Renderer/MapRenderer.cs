@@ -23,6 +23,8 @@ namespace ArgentumOnline.Renderer
         [SerializeField] private int viewportRadius = 9;   // 9 = 19x19 tiles visibles
         [SerializeField] private float tileSize     = 1f;  // 1 unidad Unity = 1 tile
 
+        public int ViewportRadius => viewportRadius;
+
         // Pool de SpriteRenderers por capa
         private readonly Dictionary<string, List<SpriteRenderer>> _pool =
             new Dictionary<string, List<SpriteRenderer>>();
@@ -69,9 +71,10 @@ namespace ArgentumOnline.Renderer
 
             int poolIdx = 0;
 
-            for (int dy = -viewportRadius; dy <= viewportRadius; dy++)
+            int renderRadius = viewportRadius + 1; // +1 tile de buffer en los bordes
+        for (int dy = -renderRadius; dy <= renderRadius; dy++)
             {
-                for (int dx = -viewportRadius; dx <= viewportRadius; dx++)
+                for (int dx = -renderRadius; dx <= renderRadius; dx++)
                 {
                     int mapX = centerX + dx;
                     int mapY = centerY + dy;

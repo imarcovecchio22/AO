@@ -18,6 +18,8 @@ namespace ArgentumOnline.Renderer
         private readonly Dictionary<long, EntityView> _views = new();
         private EntityView _localPlayerView;
 
+        private Vector2 _prevPlayerTile;
+
         void Awake() => Instance = this;
 
         public void Initialize()
@@ -31,9 +33,14 @@ namespace ArgentumOnline.Renderer
 
             // Jugador local
             gs.LocalPlayer.OnPositionChanged += RefreshLocalPlayer;
+            _prevPlayerTile = new Vector2(gs.LocalPlayer.PosX, gs.LocalPlayer.PosY);
 
             // Crear vista del jugador local
             CreateLocalPlayerView();
+
+            // Entidades que llegaron antes de que el mapa terminara de cargar
+            foreach (var entity in gs.Entities.Values)
+                OnEntityAdded(entity);
         }
 
         // ── Jugador local ─────────────────────────────────────────────────────
@@ -57,9 +64,12 @@ namespace ArgentumOnline.Renderer
         {
             if (_localPlayerView == null) return;
             var p = GameState.Instance.LocalPlayer;
+            _prevPlayerTile = new Vector2(p.PosX, p.PosY);
+
             _localPlayerView.Heading = p.Heading;
             _localPlayerView.StartWalkAnimation();
             StartCoroutine(StopAnimAfterMove(_localPlayerView));
+
             RefreshAllPositions();
         }
 
@@ -95,7 +105,12 @@ namespace ArgentumOnline.Renderer
         {
             if (!_views.TryGetValue(entity.Id, out var view)) return;
             view.Heading = entity.Heading;
-            UpdateEntityPosition(view, entity);
+
+            var p  = GameState.Instance.LocalPlayer;
+            int dx = entity.PosX - p.PosX;
+            int dy = entity.PosY - p.PosY;
+            view.SmoothMoveTo(dx, dy);
+
             view.StartWalkAnimation();
             StartCoroutine(StopAnimAfterMove(view));
         }
@@ -133,6 +148,34 @@ namespace ArgentumOnline.Renderer
             int dx = entity.PosX - p.PosX;
             int dy = entity.PosY - p.PosY;
             view.SetTilePosition(dx, dy);
+        }
+
+        // ── Refresh de apariencia ─────────────────────────────────────────────
+
+        public void RefreshLocalPlayerAppearance()
+        {
+            if (_localPlayerView == null) return;
+            var p = GameState.Instance.LocalPlayer;
+            _localPlayerView.IdHead   = p.IdHead;
+            _localPlayerView.IdBody   = p.IdBody;
+            _localPlayerView.IdHelmet = p.IdHelmet;
+            _localPlayerView.IdWeapon = p.IdWeapon;
+            _localPlayerView.IdShield = p.IdShield;
+            _localPlayerView.Heading  = p.Heading;
+            _localPlayerView.Refresh();
+        }
+
+        public void RefreshEntityView(long id)
+        {
+            if (!_views.TryGetValue(id, out var view)) return;
+            if (!GameState.Instance.TryGetEntity(id, out var entity)) return;
+            view.IdHead   = entity.IdHead;
+            view.IdBody   = entity.IdBody;
+            view.IdHelmet = entity.IdHelmet;
+            view.IdWeapon = entity.IdWeapon;
+            view.IdShield = entity.IdShield;
+            view.Heading  = entity.Heading;
+            view.Refresh();
         }
 
         private void RefreshAllPositions()

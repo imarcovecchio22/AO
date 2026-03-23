@@ -5,30 +5,35 @@ using ArgentumOnline.Game;
 namespace ArgentumOnline.UI
 {
     /// <summary>
-    /// HUD compacto: barras de HP y Mana en la esquina superior izquierda.
-    /// Bordes redondeados y sombra generados en runtime via Texture2D.
+    /// HUD estilo Eternum: barras HP/Mana flotantes (sin panel), ícono circular a la izquierda,
+    /// nombre del mapa debajo. Esquina superior izquierda.
     /// </summary>
     public class HudUI : MonoBehaviour
     {
-        private Image _hpFill;
-        private Image _manaFill;
-        private Text  _hpText;
-        private Text  _manaText;
+        public static HudUI Instance { get; private set; }
 
-        // Colores
-        private static readonly Color HpColor   = new Color(0.22f, 0.82f, 0.35f, 1f);   // verde
-        private static readonly Color ManaColor = new Color(0.22f, 0.50f, 0.98f, 1f);   // azul
+        private Image  _hpFill;
+        private Image  _manaFill;
+        private Text   _hpText;
+        private Text   _manaText;
+        private Text   _mapNameText;
+
+        private static readonly Color HpColor   = new Color(0.82f, 0.15f, 0.15f, 1f);
+        private static readonly Color ManaColor = new Color(0.18f, 0.70f, 0.80f, 1f);
+
+        void Awake() => Instance = this;
 
         void Start()
         {
             BuildHud();
-            GameState.Instance.OnConnected += Subscribe;
-            if (GameState.Instance.LocalPlayer != null) Subscribe();
+            GameState.Instance.OnConnected    += Subscribe;
+            GameState.Instance.OnMapNameChanged += OnMapName;
         }
 
         void OnDestroy()
         {
-            GameState.Instance.OnConnected -= Subscribe;
+            GameState.Instance.OnConnected    -= Subscribe;
+            GameState.Instance.OnMapNameChanged -= OnMapName;
             if (GameState.Instance.LocalPlayer != null)
                 GameState.Instance.LocalPlayer.OnStatsChanged -= Refresh;
         }
@@ -37,6 +42,11 @@ namespace ArgentumOnline.UI
         {
             GameState.Instance.LocalPlayer.OnStatsChanged += Refresh;
             Refresh();
+        }
+
+        private void OnMapName(string name)
+        {
+            if (_mapNameText != null) _mapNameText.text = name;
         }
 
         // ── Construcción ──────────────────────────────────────────────────────
@@ -53,168 +63,133 @@ namespace ArgentumOnline.UI
             canvasGo.AddComponent<GraphicRaycaster>();
             DontDestroyOnLoad(canvasGo);
 
-            // Panel — esquina superior izquierda
-            var panel     = CreateRect("StatsPanel", canvasGo.transform);
-            var panelRect = panel.GetComponent<RectTransform>();
-            panelRect.anchorMin        = new Vector2(1, 1);
-            panelRect.anchorMax        = new Vector2(1, 1);
-            panelRect.pivot            = new Vector2(1, 1);
-            panelRect.anchoredPosition = new Vector2(-18, -18);
-            panelRect.sizeDelta        = new Vector2(210, 70);
+            // Contenedor principal — esquina superior izquierda
+            var container   = MakeRect("HudContainer", canvasGo.transform);
+            var containerRt = container.GetComponent<RectTransform>();
+            containerRt.anchorMin        = new Vector2(0, 1);
+            containerRt.anchorMax        = new Vector2(0, 1);
+            containerRt.pivot            = new Vector2(0, 1);
+            containerRt.anchoredPosition = new Vector2(16, -16);
+            containerRt.sizeDelta        = new Vector2(240, 90);
 
-            // Fondo redondeado oscuro
-            var bg = panel.AddComponent<Image>();
-            bg.sprite = MakeRoundedRect(210, 70, 12, new Color(0.06f, 0.06f, 0.10f, 0.82f));
-            bg.type   = Image.Type.Simple;
+            _hpFill   = BuildBar(container.transform, 0, HpColor,   "#", out _hpText);
+            _manaFill = BuildBar(container.transform, 1, ManaColor, "~", out _manaText);
 
-            // Sombra del panel
-            var shadow = panel.AddComponent<Shadow>();
-            shadow.effectColor    = new Color(0, 0, 0, 0.6f);
-            shadow.effectDistance = new Vector2(3, -3);
-
-            _hpFill   = BuildBar(panel.transform, 0, HpColor,   out _hpText);
-            _manaFill = BuildBar(panel.transform, 1, ManaColor, out _manaText);
+            // Nombre del mapa debajo de las barras
+            var mapNameGo = MakeRect("MapName", container.transform);
+            var mapNameRt = mapNameGo.GetComponent<RectTransform>();
+            mapNameRt.anchorMin        = new Vector2(0, 0);
+            mapNameRt.anchorMax        = new Vector2(1, 0);
+            mapNameRt.pivot            = new Vector2(0, 1);
+            mapNameRt.anchoredPosition = new Vector2(0, -4);
+            mapNameRt.sizeDelta        = new Vector2(0, 24);
+            _mapNameText = mapNameGo.AddComponent<Text>();
+            _mapNameText.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _mapNameText.fontSize  = 16;
+            _mapNameText.color     = new Color(1f, 1f, 1f, 0.80f);
+            _mapNameText.alignment = TextAnchor.MiddleLeft;
+            var mapSh = mapNameGo.AddComponent<Shadow>();
+            mapSh.effectColor    = new Color(0, 0, 0, 0.9f);
+            mapSh.effectDistance = new Vector2(1, -1);
         }
 
-        private Image BuildBar(Transform parent, int row, Color fillColor, out Text label)
+        /// <summary>
+        /// Una barra: círculo de ícono a la izquierda + barra redondeada con texto.
+        /// row = 0 (HP) o 1 (Mana).
+        /// </summary>
+        private Image BuildBar(Transform parent, int row, Color color,
+                               string icon, out Text label)
         {
-            const float rowH    = 20f;
-            const float padX    = 12f;
-            const float padY    = 12f;
-            const float spacing = 6f;
-            float offsetY = -(padY + row * (rowH + spacing));
+            const float barH    = 28f;
+            const float iconD   = 32f;
+            const float spacing = 8f;
+            const float gap     = 6f;
+            float y = -(row * (barH + gap));
 
-            // Track redondeado
-            var track     = CreateRect($"Track{row}", parent);
-            var trackRect = track.GetComponent<RectTransform>();
-            trackRect.anchorMin        = new Vector2(0, 1);
-            trackRect.anchorMax        = new Vector2(1, 1);
-            trackRect.pivot            = new Vector2(0, 1);
-            trackRect.anchoredPosition = new Vector2(padX, offsetY);
-            trackRect.sizeDelta        = new Vector2(-(padX * 2), rowH);
-            var trackImg = track.AddComponent<Image>();
-            trackImg.sprite = MakeRoundedRect(186, 20, 10, new Color(0.12f, 0.12f, 0.16f, 1f));
-            trackImg.type   = Image.Type.Simple;
+            // Ícono circular
+            var iconGo = MakeRect($"Icon{row}", parent);
+            var iconRt = iconGo.GetComponent<RectTransform>();
+            iconRt.anchorMin        = new Vector2(0, 1);
+            iconRt.anchorMax        = new Vector2(0, 1);
+            iconRt.pivot            = new Vector2(0, 1);
+            iconRt.anchoredPosition = new Vector2(0, y);
+            iconRt.sizeDelta        = new Vector2(iconD, iconD);
 
-            // Fill redondeado con máscara
-            var maskGo = CreateRect("Mask", track.transform);
-            var maskRect = maskGo.GetComponent<RectTransform>();
-            maskRect.anchorMin = Vector2.zero;
-            maskRect.anchorMax = Vector2.one;
-            maskRect.offsetMin = Vector2.zero;
-            maskRect.offsetMax = Vector2.zero;
-            var mask = maskGo.AddComponent<Mask>();
+            var iconImg = iconGo.AddComponent<Image>();
+            iconImg.sprite = MakeCircle(32, new Color(color.r * 0.6f, color.g * 0.6f, color.b * 0.6f, 0.9f));
+            iconImg.type   = Image.Type.Simple;
+
+            var iconLbl = MakeRect($"IconLbl{row}", iconGo.transform);
+            var iconLblRt = iconLbl.GetComponent<RectTransform>();
+            iconLblRt.anchorMin = Vector2.zero;
+            iconLblRt.anchorMax = Vector2.one;
+            var iconTxt = iconLbl.AddComponent<Text>();
+            iconTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            iconTxt.text      = icon;
+            iconTxt.fontSize  = 16;
+            iconTxt.fontStyle = FontStyle.Bold;
+            iconTxt.color     = Color.white;
+            iconTxt.alignment = TextAnchor.MiddleCenter;
+
+            // Track (fondo de la barra)
+            float barX = iconD + spacing;
+            float barW = 240f - barX;
+
+            var trackGo = MakeRect($"Track{row}", parent);
+            var trackRt = trackGo.GetComponent<RectTransform>();
+            trackRt.anchorMin        = new Vector2(0, 1);
+            trackRt.anchorMax        = new Vector2(0, 1);
+            trackRt.pivot            = new Vector2(0, 1);
+            trackRt.anchoredPosition = new Vector2(barX, y + (iconD - barH) / 2f);
+            trackRt.sizeDelta        = new Vector2(barW, barH);
+
+            var trackImg = trackGo.AddComponent<Image>();
+            trackImg.sprite = MakeRounded((int)barW, (int)barH, barH / 2f,
+                                          new Color(0f, 0f, 0f, 0.55f));
+            trackImg.type = Image.Type.Simple;
+
+            // Fill con máscara
+            var maskGo  = MakeRect($"Mask{row}", trackGo.transform);
+            var maskRt  = maskGo.GetComponent<RectTransform>();
+            maskRt.anchorMin = Vector2.zero;
+            maskRt.anchorMax = Vector2.one;
+            maskRt.offsetMin = maskRt.offsetMax = Vector2.zero;
+            var mask    = maskGo.AddComponent<Mask>();
             mask.showMaskGraphic = false;
             var maskImg = maskGo.AddComponent<Image>();
-            maskImg.sprite = MakeRoundedRect(186, 20, 10, Color.white);
+            maskImg.sprite = MakeRounded((int)barW, (int)barH, barH / 2f, Color.white);
 
-            var fill     = CreateRect("Fill", maskGo.transform);
-            var fillRect = fill.GetComponent<RectTransform>();
-            fillRect.anchorMin = Vector2.zero;
-            fillRect.anchorMax = Vector2.one;
-            fillRect.offsetMin = Vector2.zero;
-            fillRect.offsetMax = Vector2.zero;
-            var fillImg = fill.AddComponent<Image>();
-            fillImg.sprite     = MakeBarGradient(186, 20, fillColor);
+            var fillGo  = MakeRect($"Fill{row}", maskGo.transform);
+            var fillRt  = fillGo.GetComponent<RectTransform>();
+            fillRt.anchorMin = Vector2.zero;
+            fillRt.anchorMax = Vector2.one;
+            fillRt.offsetMin = fillRt.offsetMax = Vector2.zero;
+            var fillImg = fillGo.AddComponent<Image>();
+            fillImg.sprite     = MakeBarGradient((int)barW, (int)barH, color);
             fillImg.type       = Image.Type.Filled;
             fillImg.fillMethod = Image.FillMethod.Horizontal;
             fillImg.fillAmount = 1f;
 
-            // Texto sobre la barra
-            var textGo   = CreateRect("Label", track.transform);
-            var textRect = textGo.GetComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(4, 0);
-            textRect.offsetMax = new Vector2(-4, 0);
-            var txt = textGo.AddComponent<Text>();
+            // Texto HP/Mana sobre la barra
+            var lblGo = MakeRect($"Label{row}", trackGo.transform);
+            var lblRt = lblGo.GetComponent<RectTransform>();
+            lblRt.anchorMin = Vector2.zero;
+            lblRt.anchorMax = Vector2.one;
+            lblRt.offsetMin = new Vector2(8, 0);
+            lblRt.offsetMax = new Vector2(-8, 0);
+            var txt = lblGo.AddComponent<Text>();
             txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txt.fontSize  = 11;
+            txt.fontSize  = 15;
             txt.fontStyle = FontStyle.Bold;
-            txt.color     = new Color(1f, 1f, 1f, 0.95f);
+            txt.color     = Color.white;
             txt.alignment = TextAnchor.MiddleCenter;
-            txt.text      = "—";
-
-            // Sombra en el texto
-            var txtShadow = textGo.AddComponent<Shadow>();
-            txtShadow.effectColor    = new Color(0, 0, 0, 0.8f);
-            txtShadow.effectDistance = new Vector2(1, -1);
+            txt.text      = "— / —";
+            var sh = lblGo.AddComponent<Shadow>();
+            sh.effectColor    = new Color(0, 0, 0, 0.9f);
+            sh.effectDistance = new Vector2(1, -1);
 
             label = txt;
             return fillImg;
-        }
-
-        // ── Helpers de textura ────────────────────────────────────────────────
-
-        /// <summary>Rectángulo con esquinas redondeadas y anti-aliasing suave.</summary>
-        private static Sprite MakeRoundedRect(int w, int h, float radius, Color color)
-        {
-            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-            tex.filterMode = FilterMode.Bilinear;
-            var pixels = new Color[w * h];
-
-            for (int y = 0; y < h; y++)
-            {
-                for (int x = 0; x < w; x++)
-                {
-                    float alpha = RoundedAlpha(x, y, w, h, radius);
-                    pixels[y * w + x] = new Color(color.r, color.g, color.b, color.a * alpha);
-                }
-            }
-
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f));
-        }
-
-        /// <summary>Gradiente horizontal: color sólido abajo, brillo sutil arriba.</summary>
-        private static Sprite MakeBarGradient(int w, int h, Color baseColor)
-        {
-            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-            tex.filterMode = FilterMode.Bilinear;
-            var pixels = new Color[w * h];
-
-            for (int y = 0; y < h; y++)
-            {
-                float t = y / (float)(h - 1);
-                // Brillo: parte superior 30% más clara
-                float bright = Mathf.Lerp(0.78f, 1.0f, t);
-                var c = new Color(
-                    Mathf.Clamp01(baseColor.r * bright),
-                    Mathf.Clamp01(baseColor.g * bright),
-                    Mathf.Clamp01(baseColor.b * bright),
-                    baseColor.a);
-                for (int x = 0; x < w; x++)
-                    pixels[y * w + x] = c;
-            }
-
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0, 0.5f));
-        }
-
-        /// <summary>Devuelve 0-1 con suavizado en las esquinas redondeadas.</summary>
-        private static float RoundedAlpha(int x, int y, int w, int h, float r)
-        {
-            float px = x + 0.5f;
-            float py = y + 0.5f;
-
-            // Centro del corner más cercano
-            float cx = px < r ? r : (px > w - r ? w - r : px);
-            float cy = py < r ? r : (py > h - r ? h - r : py);
-
-            float dist = Mathf.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
-
-            // Anti-aliasing: suavizar 1px alrededor del borde
-            return Mathf.Clamp01(r - dist + 0.5f);
-        }
-
-        private static GameObject CreateRect(string name, Transform parent)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            go.AddComponent<RectTransform>();
-            return go;
         }
 
         // ── Actualización ─────────────────────────────────────────────────────
@@ -224,13 +199,79 @@ namespace ArgentumOnline.UI
             var p = GameState.Instance.LocalPlayer;
             if (p == null) return;
 
-            float hpPct   = p.MaxHP   > 0 ? (float)p.HP   / p.MaxHP   : 0f;
-            float manaPct = p.MaxMana > 0 ? (float)p.Mana / p.MaxMana : 0f;
+            if (_hpFill != null)
+                _hpFill.fillAmount = p.MaxHP   > 0 ? (float)p.HP   / p.MaxHP   : 0f;
+            if (_manaFill != null)
+                _manaFill.fillAmount = p.MaxMana > 0 ? (float)p.Mana / p.MaxMana : 0f;
+            if (_hpText != null)
+                _hpText.text   = $"{p.HP} / {p.MaxHP}";
+            if (_manaText != null)
+                _manaText.text = $"{p.Mana} / {p.MaxMana}";
+        }
 
-            if (_hpFill   != null) _hpFill.fillAmount  = hpPct;
-            if (_manaFill != null) _manaFill.fillAmount = manaPct;
-            if (_hpText   != null) _hpText.text         = $"{p.HP} / {p.MaxHP}";
-            if (_manaText != null) _manaText.text        = $"{p.Mana} / {p.MaxMana}";
+        // ── Helpers de textura ────────────────────────────────────────────────
+
+        private static Sprite MakeRounded(int w, int h, float r, Color color)
+        {
+            var tex    = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            var pixels = new Color[w * h];
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                float px = x + 0.5f, py = y + 0.5f;
+                float cx = Mathf.Clamp(px, r, w - r);
+                float cy = Mathf.Clamp(py, r, h - r);
+                float d  = Mathf.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+                float a  = Mathf.Clamp01(r - d + 0.5f);
+                pixels[y * w + x] = new Color(color.r, color.g, color.b, color.a * a);
+            }
+            tex.SetPixels(pixels); tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f));
+        }
+
+        private static Sprite MakeCircle(int size, Color color)
+        {
+            float r = size / 2f;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x + 0.5f - r, dy = y + 0.5f - r;
+                float d  = Mathf.Sqrt(dx * dx + dy * dy);
+                float a  = Mathf.Clamp01(r - d + 0.5f);
+                pixels[y * size + x] = new Color(color.r, color.g, color.b, color.a * a);
+            }
+            tex.SetPixels(pixels); tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        private static Sprite MakeBarGradient(int w, int h, Color base_)
+        {
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            var pixels = new Color[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                float t      = y / (float)(h - 1);
+                float bright = Mathf.Lerp(0.75f, 1.05f, t);
+                var c = new Color(Mathf.Clamp01(base_.r * bright),
+                                  Mathf.Clamp01(base_.g * bright),
+                                  Mathf.Clamp01(base_.b * bright), 1f);
+                for (int x = 0; x < w; x++) pixels[y * w + x] = c;
+            }
+            tex.SetPixels(pixels); tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0, 0.5f));
+        }
+
+        private static GameObject MakeRect(string name, Transform parent)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<RectTransform>();
+            return go;
         }
     }
 }
