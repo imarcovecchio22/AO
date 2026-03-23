@@ -56,10 +56,10 @@ namespace ArgentumOnline.UI
             // Panel — esquina superior izquierda
             var panel     = CreateRect("StatsPanel", canvasGo.transform);
             var panelRect = panel.GetComponent<RectTransform>();
-            panelRect.anchorMin        = new Vector2(0, 1);
-            panelRect.anchorMax        = new Vector2(0, 1);
-            panelRect.pivot            = new Vector2(0, 1);
-            panelRect.anchoredPosition = new Vector2(18, -18);
+            panelRect.anchorMin        = new Vector2(1, 1);
+            panelRect.anchorMax        = new Vector2(1, 1);
+            panelRect.pivot            = new Vector2(1, 1);
+            panelRect.anchoredPosition = new Vector2(-18, -18);
             panelRect.sizeDelta        = new Vector2(210, 70);
 
             // Fondo redondeado oscuro

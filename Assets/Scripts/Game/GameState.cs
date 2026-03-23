@@ -25,7 +25,7 @@ namespace ArgentumOnline.Game
         public event Action<CharacterEntity> OnEntityAdded;
         public event Action<long>            OnEntityRemoved;
         public event Action<CharacterEntity> OnEntityMoved;
-        public event Action<string>          OnConsoleMessage;
+        public event Action<string, string>  OnConsoleMessage;  // msg, hexColor (puede ser "")
         public event Action<string>          OnMapNameChanged;
         public event Action<ushort>          OnOnlineCountChanged;
         public event Action                  OnConnected;      // recibido GetMyCharacter
@@ -139,8 +139,8 @@ namespace ArgentumOnline.Game
 
         // ── Helpers globales ──────────────────────────────────────────────────
 
-        public void AddConsoleMessage(string msg)
-            => OnConsoleMessage?.Invoke(msg);
+        public void AddConsoleMessage(string msg, string hexColor = "")
+            => OnConsoleMessage?.Invoke(msg, hexColor);
 
         public void SetMapName(string name)
             => OnMapNameChanged?.Invoke(name);

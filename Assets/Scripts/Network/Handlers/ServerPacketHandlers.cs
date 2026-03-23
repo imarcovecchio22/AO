@@ -219,6 +219,7 @@ namespace ArgentumOnline.Network.Handlers
         {
             ushort online = buf.ReadShort();
             GS.SetOnlineCount(online);
+            GS.AddConsoleMessage($"Usuarios online: {online}", "#aaddff");
         }
 
         public void OnUpdateAgilidad(ByteBuffer buf)
@@ -358,7 +359,7 @@ namespace ArgentumOnline.Network.Handlers
             byte   console = buf.ReadByte();
 
             if (console == 1)
-                GS.AddConsoleMessage(msg);
+                GS.AddConsoleMessage(msg, color);
             // TODO: DialogBubbleManager.Instance.ShowBubble(id, msg, color)
         }
 
@@ -369,14 +370,14 @@ namespace ArgentumOnline.Network.Handlers
             string color    = hasColor == 1 ? buf.ReadString() : string.Empty;
             byte   bold     = buf.ReadByte();
             byte   italica  = buf.ReadByte();
-            GS.AddConsoleMessage(msg);
+            GS.AddConsoleMessage(msg, color);
         }
 
         public void OnError(ByteBuffer buf)
         {
             string msg = buf.ReadString();
             Debug.LogError($"[Server] {msg}");
-            // TODO: UIManager.Instance.ShowErrorModal(msg)
+            GS.AddConsoleMessage(msg, "#ff4444");
         }
 
         // ── Inventario y mapa ────────────────────────────────────────────────
