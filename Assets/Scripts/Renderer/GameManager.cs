@@ -2,12 +2,14 @@ using System.Collections;
 using UnityEngine;
 using ArgentumOnline.Game;
 using ArgentumOnline.Network;
+using ArgentumOnline.UI;
 
 namespace ArgentumOnline.Renderer
 {
     /// <summary>
-    /// Orquesta la inicialización: carga assets → conecta al servidor → arranca el render.
-    /// Adjuntar al mismo GameObject que NetworkManager, GrhDatabase, MapLoader y MapRenderer.
+    /// Orquesta la inicialización: login → carga assets → conecta → render.
+    /// Adjuntar al mismo GameObject que NetworkManager, GrhDatabase, MapLoader, MapRenderer,
+    /// ApiClient, LoginUI, HudUI, ConsoleUI, PlayerController y JoystickUI.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
@@ -15,30 +17,27 @@ namespace ArgentumOnline.Renderer
 
         void Awake() => Instance = this;
 
-        [Header("Credenciales de prueba")]
-        public string accountId   = "69c0a6c336a1fe21e4f99c0c";
-        public string characterId = "69c0a79ab2406d190cf6d928";
-        public string email       = "test@test.com";
-        public byte   typeGame    = 1;
-        public byte   idChar      = 0;
-
         IEnumerator Start()
         {
-            // 1. Setear credenciales
+            // 1. Cargar assets en paralelo con el login
+            yield return StartCoroutine(GrhDatabase.Instance.Initialize());
+            yield return StartCoroutine(EntityDatabase.Instance.Initialize());
+
+            // 2. Mostrar login y esperar selección de personaje
+            LoginUI.Instance.OnCharacterSelected += OnCharacterSelected;
+        }
+
+        private void OnCharacterSelected(string accountId, string characterId, string email)
+        {
             SessionData.Current = new SessionData
             {
                 AccountId   = accountId,
                 CharacterId = characterId,
                 Email       = email,
-                TypeGame    = typeGame,
-                IdChar      = idChar
+                TypeGame    = 1,
+                IdChar      = 0
             };
 
-            // 2. Inicializar bases de datos de assets
-            yield return StartCoroutine(GrhDatabase.Instance.Initialize());
-            yield return StartCoroutine(EntityDatabase.Instance.Initialize());
-
-            // 3. Conectar al servidor
             GameState.Instance.OnConnected += OnConnected;
             NetworkManager.Instance.Connect();
         }
@@ -47,8 +46,6 @@ namespace ArgentumOnline.Renderer
         {
             var p = GameState.Instance.LocalPlayer;
             Debug.Log($"[GM] Conectado: {p.Name} en mapa {p.Map}");
-
-            // 3. Cargar el mapa
             StartCoroutine(MapLoader.Instance.LoadMap(p.Map, OnMapLoaded));
         }
 
@@ -58,13 +55,12 @@ namespace ArgentumOnline.Renderer
 
             MapRenderer.Instance.SetMap(map);
 
-            // 4. Arrancar render del mapa
             var p = GameState.Instance.LocalPlayer;
             MapRenderer.Instance.UpdateViewport(p.PosX, p.PosY);
             p.OnPositionChanged += OnPlayerMoved;
 
-            // 5. Inicializar renderer de entidades
             EntityRenderer.Instance.Initialize();
+            GameState.Instance.OnTeleport += OnTeleport;
 
             Debug.Log($"[GM] Mapa {map.MapNumber} listo — renderizando viewport");
         }
@@ -73,6 +69,17 @@ namespace ArgentumOnline.Renderer
         {
             var p = GameState.Instance.LocalPlayer;
             MapRenderer.Instance.UpdateViewport(p.PosX, p.PosY);
+        }
+
+        private void OnTeleport(ushort map, byte posX, byte posY)
+        {
+            Debug.Log($"[GM] Cargando mapa {map} tras teleport");
+            StartCoroutine(MapLoader.Instance.LoadMap(map, loadedMap =>
+            {
+                if (loadedMap == null) { Debug.LogError($"[GM] Mapa {map} no encontrado"); return; }
+                MapRenderer.Instance.SetMap(loadedMap);
+                MapRenderer.Instance.UpdateViewport(posX, posY);
+            }));
         }
     }
 }

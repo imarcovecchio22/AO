@@ -1,4 +1,6 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace ArgentumOnline.Renderer
 {
@@ -17,6 +19,10 @@ namespace ArgentumOnline.Renderer
 
         // Nombre flotante
         public TextMesh NameLabel;
+
+        // Burbuja de diálogo
+        private GameObject _bubbleGo;
+        private Coroutine  _bubbleCoroutine;
 
         // Estado actual
         public long   EntityId;
@@ -129,6 +135,89 @@ namespace ArgentumOnline.Renderer
             HelmetRenderer.sortingOrder = yOrder + 2;
             WeaponRenderer.sortingOrder = yOrder + 3;
             ShieldRenderer.sortingOrder = yOrder + 4;
+        }
+
+        // ── Burbuja de diálogo ────────────────────────────────────────────────
+
+        public void ShowBubble(string text, Color textColor)
+        {
+            if (_bubbleCoroutine != null)
+            {
+                StopCoroutine(_bubbleCoroutine);
+                if (_bubbleGo != null) Destroy(_bubbleGo);
+            }
+            _bubbleCoroutine = StartCoroutine(BubbleRoutine(text, textColor));
+        }
+
+        private IEnumerator BubbleRoutine(string text, Color textColor)
+        {
+            // Canvas world-space anclado sobre la cabeza
+            _bubbleGo = new GameObject("Bubble");
+            _bubbleGo.transform.SetParent(transform, false);
+            // Posición: encima del name label (que está a y=0.8)
+            _bubbleGo.transform.localPosition = new Vector3(0, 1.15f, -0.1f);
+            // Escala: sizeDelta=300x55 → 1 unit = 1/80 world → ~3.75 tiles de ancho
+            _bubbleGo.transform.localScale = Vector3.one * (1f / 80f);
+
+            var canvas = _bubbleGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.sortingOrder = 200;
+
+            var rt = _bubbleGo.GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(300, 55);
+
+            // Fondo oscuro semitransparente
+            var bgGo  = new GameObject("BG");
+            bgGo.transform.SetParent(_bubbleGo.transform, false);
+            var bgRt  = bgGo.AddComponent<RectTransform>();
+            bgRt.anchorMin = Vector2.zero;
+            bgRt.anchorMax = Vector2.one;
+            bgRt.offsetMin = bgRt.offsetMax = Vector2.zero;
+            var bgImg = bgGo.AddComponent<Image>();
+            bgImg.color = new Color(0.04f, 0.04f, 0.10f, 0.88f);
+
+            // Texto del mensaje
+            var txtGo  = new GameObject("Text");
+            txtGo.transform.SetParent(_bubbleGo.transform, false);
+            var txtRt  = txtGo.AddComponent<RectTransform>();
+            txtRt.anchorMin = Vector2.zero;
+            txtRt.anchorMax = Vector2.one;
+            txtRt.offsetMin = new Vector2(8, 4);
+            txtRt.offsetMax = new Vector2(-8, -4);
+            var txt    = txtGo.AddComponent<Text>();
+            txt.font               = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.text               = text;
+            txt.fontSize           = 24;
+            txt.color              = textColor;
+            txt.alignment          = TextAnchor.MiddleCenter;
+            txt.horizontalOverflow = HorizontalWrapMode.Wrap;
+            txt.verticalOverflow   = VerticalWrapMode.Overflow;
+
+            var shadow = txtGo.AddComponent<Shadow>();
+            shadow.effectColor    = new Color(0, 0, 0, 0.8f);
+            shadow.effectDistance = new Vector2(1, -1);
+
+            // Mantener 3.5 segundos
+            yield return new WaitForSeconds(3.5f);
+
+            // Fade out en 0.6 s
+            float elapsed  = 0f;
+            float fadeTime = 0.6f;
+            Color bgStart  = bgImg.color;
+            Color txStart  = txt.color;
+
+            while (elapsed < fadeTime)
+            {
+                elapsed += Time.deltaTime;
+                float a = 1f - (elapsed / fadeTime);
+                bgImg.color = new Color(bgStart.r, bgStart.g, bgStart.b, bgStart.a * a);
+                txt.color   = new Color(txStart.r, txStart.g, txStart.b, txStart.a * a);
+                yield return null;
+            }
+
+            Destroy(_bubbleGo);
+            _bubbleGo        = null;
+            _bubbleCoroutine = null;
         }
     }
 }

@@ -26,6 +26,7 @@ namespace ArgentumOnline.Renderer
             gs.OnEntityAdded   += OnEntityAdded;
             gs.OnEntityRemoved += OnEntityRemoved;
             gs.OnEntityMoved   += OnEntityMoved;
+            gs.OnDialogBubble  += OnDialogBubble;
 
             // Jugador local
             gs.LocalPlayer.OnPositionChanged += RefreshLocalPlayer;
@@ -93,6 +94,25 @@ namespace ArgentumOnline.Renderer
         {
             if (_views.TryGetValue(entity.Id, out var view))
                 UpdateEntityPosition(view, entity);
+        }
+
+        // ── Burbujas de diálogo ───────────────────────────────────────────────
+
+        private void OnDialogBubble(long entityId, string msg, string hexColor)
+        {
+            Color color = new Color(0.95f, 0.95f, 0.95f, 1f);
+            if (!string.IsNullOrEmpty(hexColor))
+                ColorUtility.TryParseHtmlString(hexColor, out color);
+
+            // Jugador local
+            if (entityId == GameState.Instance.LocalPlayer.Id)
+            {
+                _localPlayerView?.ShowBubble(msg, color);
+                return;
+            }
+
+            if (_views.TryGetValue(entityId, out var view))
+                view.ShowBubble(msg, color);
         }
 
         // ── Posicionamiento ───────────────────────────────────────────────────

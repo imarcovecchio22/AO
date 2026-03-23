@@ -25,7 +25,9 @@ namespace ArgentumOnline.Game
         public event Action<CharacterEntity> OnEntityAdded;
         public event Action<long>            OnEntityRemoved;
         public event Action<CharacterEntity> OnEntityMoved;
-        public event Action<string, string>  OnConsoleMessage;  // msg, hexColor (puede ser "")
+        public event Action<string, string>  OnConsoleMessage;   // msg, hexColor (puede ser "")
+        public event Action<long, string, string> OnDialogBubble;  // entityId, msg, hexColor
+        public event Action<ushort, byte, byte>   OnTeleport;      // map, posX, posY
         public event Action<string>          OnMapNameChanged;
         public event Action<ushort>          OnOnlineCountChanged;
         public event Action                  OnConnected;      // recibido GetMyCharacter
@@ -70,6 +72,7 @@ namespace ArgentumOnline.Game
             p.Agilidad     = agilidad;
             p.Fuerza       = fuerza;
 
+            p.NotifyStatsChanged();
             OnConnected?.Invoke();
         }
 
@@ -141,6 +144,18 @@ namespace ArgentumOnline.Game
 
         public void AddConsoleMessage(string msg, string hexColor = "")
             => OnConsoleMessage?.Invoke(msg, hexColor);
+
+        public void ShowDialogBubble(long entityId, string msg, string hexColor = "")
+            => OnDialogBubble?.Invoke(entityId, msg, hexColor);
+
+        public void Teleport(ushort map, byte posX, byte posY)
+        {
+            ClearEntities();
+            LocalPlayer.Map  = map;
+            LocalPlayer.PosX = posX;
+            LocalPlayer.PosY = posY;
+            OnTeleport?.Invoke(map, posX, posY);
+        }
 
         public void SetMapName(string name)
             => OnMapNameChanged?.Invoke(name);

@@ -162,13 +162,8 @@ namespace ArgentumOnline.Network.Handlers
             byte   posX = buf.ReadByte();
             byte   posY = buf.ReadByte();
 
-            GS.ClearEntities();
-            GS.LocalPlayer.Map  = map;
-            GS.LocalPlayer.PosX = posX;
-            GS.LocalPlayer.PosY = posY;
-            GS.LocalPlayer.NotifyPositionChanged();
-            // TODO: MapManager.Instance.LoadMap(map)
             Debug.Log($"[Net] Teleport a mapa {map} @ {posX},{posY}");
+            GS.Teleport(map, posX, posY);
         }
 
         // ── Stats ────────────────────────────────────────────────────────────
@@ -360,7 +355,8 @@ namespace ArgentumOnline.Network.Handlers
 
             if (console == 1)
                 GS.AddConsoleMessage(msg, color);
-            // TODO: DialogBubbleManager.Instance.ShowBubble(id, msg, color)
+
+            GS.ShowDialogBubble(id, msg, color);
         }
 
         public void OnConsole(ByteBuffer buf)
