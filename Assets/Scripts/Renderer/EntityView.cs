@@ -24,6 +24,9 @@ namespace ArgentumOnline.Renderer
         private GameObject _bubbleGo;
         private Coroutine  _bubbleCoroutine;
 
+        // Animación de caminata
+        private Coroutine _walkAnim;
+
         // Estado actual
         public long   EntityId;
         public byte   Heading = 2;  // Down por defecto
@@ -122,6 +125,55 @@ namespace ArgentumOnline.Renderer
             {
                 if (HeadRenderer != null) HeadRenderer.sprite = sprite;
             });
+        }
+
+        // ── Animación de caminata ─────────────────────────────────────────────
+
+        /// <summary>Inicia la animación de caminata en el heading actual.</summary>
+        public void StartWalkAnimation()
+        {
+            if (_walkAnim != null) StopCoroutine(_walkAnim);
+            _walkAnim = StartCoroutine(WalkAnimRoutine());
+        }
+
+        /// <summary>Detiene la animación y vuelve al frame estático (frame 1).</summary>
+        public void StopWalkAnimation()
+        {
+            if (_walkAnim != null) { StopCoroutine(_walkAnim); _walkAnim = null; }
+            Refresh();
+        }
+
+        private IEnumerator WalkAnimRoutine()
+        {
+            // Obtener grhIndex animado del body para el heading actual
+            if (IdBody <= 0 || !EntityDatabase.Instance.Bodies.TryGetValue(IdBody, out var bodyDg))
+                yield break;
+
+            int baseGrh = EntityDatabase.GetGrhForHeading(bodyDg, Heading);
+            if (!GrhDatabase.Instance.TryGetGrh(baseGrh, out var animGrh) || animGrh.numFrames <= 1)
+                yield break;
+
+            float frameSec = animGrh.speed / 1000f;
+            if (frameSec <= 0) frameSec = 0.085f;
+
+            int frame = 1;
+            while (true)
+            {
+                string key = frame.ToString();
+                if (animGrh.frames != null && animGrh.frames.TryGetValue(key, out string frameStr)
+                    && int.TryParse(frameStr, out int frameGrh))
+                {
+                    int capturedGrh = frameGrh;
+                    SpriteRenderer capturedSr = BodyRenderer;
+                    GrhDatabase.Instance.GetSprite(capturedGrh, sprite =>
+                    {
+                        if (capturedSr != null && sprite != null) capturedSr.sprite = sprite;
+                    });
+                }
+
+                frame = (frame % animGrh.numFrames) + 1;
+                yield return new WaitForSeconds(frameSec);
+            }
         }
 
         /// <summary>Mueve la vista a una posición en coordenadas de tile relativas al centro del viewport.</summary>

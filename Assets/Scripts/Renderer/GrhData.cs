@@ -16,6 +16,7 @@ namespace ArgentumOnline.Renderer
         public int              width;
         public int              height;
         public Dictionary<string, string> frames;  // frame index → grhIndex (para animaciones)
+        public float            speed;      // ms por frame (solo animados)
         public GrhOffset        offset;
     }
 

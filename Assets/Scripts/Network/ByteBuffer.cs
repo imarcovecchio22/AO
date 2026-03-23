@@ -63,7 +63,8 @@ namespace ArgentumOnline.Network
         {
             ushort charCount = ReadShort();
             if (charCount == 0) return string.Empty;
-            // Leemos charCount bytes (asumimos UTF-8 donde 1 char = 1 byte para ASCII/Latin)
+            int available = _data.Length - _readPos;
+            if (charCount > available) return string.Empty;
             byte[] raw = new byte[charCount];
             Buffer.BlockCopy(_data, _readPos, raw, 0, charCount);
             _readPos += charCount;

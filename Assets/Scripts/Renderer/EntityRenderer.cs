@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using ArgentumOnline.Game;
@@ -57,8 +58,8 @@ namespace ArgentumOnline.Renderer
             if (_localPlayerView == null) return;
             var p = GameState.Instance.LocalPlayer;
             _localPlayerView.Heading = p.Heading;
-            _localPlayerView.Refresh();
-            // Reposicionar todas las entidades relativas al jugador
+            _localPlayerView.StartWalkAnimation();
+            StartCoroutine(StopAnimAfterMove(_localPlayerView));
             RefreshAllPositions();
         }
 
@@ -92,8 +93,17 @@ namespace ArgentumOnline.Renderer
 
         private void OnEntityMoved(CharacterEntity entity)
         {
-            if (_views.TryGetValue(entity.Id, out var view))
-                UpdateEntityPosition(view, entity);
+            if (!_views.TryGetValue(entity.Id, out var view)) return;
+            view.Heading = entity.Heading;
+            UpdateEntityPosition(view, entity);
+            view.StartWalkAnimation();
+            StartCoroutine(StopAnimAfterMove(view));
+        }
+
+        private IEnumerator StopAnimAfterMove(EntityView view)
+        {
+            yield return new WaitForSeconds(0.25f);
+            if (view != null) view.StopWalkAnimation();
         }
 
         // ── Burbujas de diálogo ───────────────────────────────────────────────
