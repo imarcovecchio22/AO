@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using ArgentumOnline.Game;
 using ArgentumOnline.Network;
 using ArgentumOnline.UI;
@@ -15,7 +16,15 @@ namespace ArgentumOnline.Renderer
     {
         public static GameManager Instance { get; private set; }
 
-        void Awake() => Instance = this;
+        void Awake()
+        {
+            Instance = this;
+
+            // El EventSystem debe estar en DontDestroyOnLoad junto a los canvases del juego,
+            // de lo contrario el raycasting entre escenas falla con InputSystemUIInputModule.
+            var es = EventSystem.current;
+            if (es != null) DontDestroyOnLoad(es.gameObject);
+        }
 
         IEnumerator Start()
         {

@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
 using ArgentumOnline.Network;
@@ -117,11 +118,32 @@ namespace ArgentumOnline.Input
             }
 
             if (!clicked) return;
-
-            // No disparar si el tap cayó sobre un elemento de UI
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+            if (IsBlockedByUI(screenPos)) return;
 
             SendClickAt(screenPos);
+        }
+
+        /// <summary>
+        /// Devuelve true solo si el punto cae sobre un elemento de UI interactivo
+        /// (botón, input, scroll) o sobre un canvas de UI "real" (sortingOrder > 10).
+        /// Ignora el JoystickPanel (sortingOrder=10, solo Image de fondo).
+        /// </summary>
+        private static bool IsBlockedByUI(Vector2 screenPos)
+        {
+            if (EventSystem.current == null) return false;
+            var results  = new System.Collections.Generic.List<RaycastResult>();
+            var eventData = new PointerEventData(EventSystem.current) { position = screenPos };
+            EventSystem.current.RaycastAll(eventData, results);
+            foreach (var r in results)
+            {
+                var go = r.gameObject;
+                if (go.GetComponent<Button>()     != null) return true;
+                if (go.GetComponent<InputField>() != null) return true;
+                if (go.GetComponent<ScrollRect>() != null) return true;
+                var canvas = go.GetComponentInParent<Canvas>();
+                if (canvas != null && canvas.sortingOrder > 10) return true;
+            }
+            return false;
         }
 
         private void SendClickAt(Vector2 screenPos)
