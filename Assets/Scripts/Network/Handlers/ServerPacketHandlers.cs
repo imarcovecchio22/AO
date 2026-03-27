@@ -66,12 +66,14 @@ namespace ArgentumOnline.Network.Handlers
             if (maxMana > 0)
             {
                 byte spellsCount = buf.ReadByte();
+                Debug.Log($"[Net] Hechizos recibidos en getMyCharacter: {spellsCount}");
                 for (int i = 0; i < spellsCount; i++)
                 {
                     byte   idPos        = buf.ReadByte();
                     ushort idSpell      = buf.ReadShort();
                     string spellName    = buf.ReadString();
                     ushort manaRequired = buf.ReadShort();
+                    Debug.Log($"[Net]   Hechizo slot={idPos} id={idSpell} nombre={spellName}");
                     GS.LocalPlayer.SetSpellSlot(idPos, idSpell, spellName, manaRequired);
                 }
             }

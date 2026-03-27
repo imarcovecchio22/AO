@@ -158,24 +158,35 @@ namespace ArgentumOnline.UI
             _inputField.onEndEdit.AddListener(OnEndEdit);
 
             var inputTextGo   = Go("Text", inputGo.transform);
-            inputTextGo.GetComponent<RectTransform>().anchorMin = Vector2.zero;
-            inputTextGo.GetComponent<RectTransform>().anchorMax = Vector2.one;
+            var inputTextRect = inputTextGo.GetComponent<RectTransform>();
+            inputTextRect.anchorMin = Vector2.zero;
+            inputTextRect.anchorMax = Vector2.one;
+            inputTextRect.offsetMin = new Vector2(4, 0);
+            inputTextRect.offsetMax = Vector2.zero;
             var inputTxt = inputTextGo.AddComponent<Text>();
-            inputTxt.font            = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            inputTxt.fontSize        = 12;
-            inputTxt.color           = Color.white;
-            inputTxt.supportRichText = false;
-            _inputField.textComponent = inputTxt;
+            inputTxt.font               = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            inputTxt.fontSize           = 12;
+            inputTxt.color              = Color.white;
+            inputTxt.supportRichText    = false;
+            inputTxt.alignment          = TextAnchor.MiddleLeft;
+            inputTxt.verticalOverflow   = VerticalWrapMode.Truncate;
+            _inputField.textComponent   = inputTxt;
 
             var phGo   = Go("Placeholder", inputGo.transform);
-            phGo.GetComponent<RectTransform>().anchorMin = Vector2.zero;
-            phGo.GetComponent<RectTransform>().anchorMax = Vector2.one;
+            var phRect = phGo.GetComponent<RectTransform>();
+            phRect.anchorMin = Vector2.zero;
+            phRect.anchorMax = Vector2.one;
+            phRect.offsetMin = new Vector2(4, 0);
+            phRect.offsetMax = Vector2.zero;
             var ph = phGo.AddComponent<Text>();
-            ph.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            ph.fontSize  = 12;
-            ph.fontStyle = FontStyle.Italic;
-            ph.color     = new Color(0.5f, 0.5f, 0.5f, 0.8f);
-            ph.text      = "Enter para chatear...";
+            ph.font                = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            ph.fontSize            = 12;
+            ph.fontStyle           = FontStyle.Italic;
+            ph.color               = new Color(0.6f, 0.6f, 0.6f, 0.9f);
+            ph.text                = "Enter para chatear...";
+            ph.alignment           = TextAnchor.MiddleLeft;
+            ph.verticalOverflow    = VerticalWrapMode.Truncate;
+            ph.horizontalOverflow  = HorizontalWrapMode.Overflow;
             _inputField.placeholder = ph;
 
             // La barra de input siempre visible como hint; se activa al presionar Enter
