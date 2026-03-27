@@ -165,6 +165,14 @@ namespace ArgentumOnline.Renderer
             _localPlayerView.Refresh();
         }
 
+        /// <summary>Devuelve el Transform de la vista de una entidad (o null si no existe).</summary>
+        public Transform GetEntityTransform(long id)
+        {
+            if (id == GameState.Instance.LocalPlayer.Id)
+                return _localPlayerView?.transform;
+            return _views.TryGetValue(id, out var view) ? view.transform : null;
+        }
+
         public void RefreshEntityView(long id)
         {
             if (!_views.TryGetValue(id, out var view)) return;

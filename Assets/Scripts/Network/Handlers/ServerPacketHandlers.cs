@@ -354,8 +354,7 @@ namespace ArgentumOnline.Network.Handlers
         {
             long   id    = buf.ReadId();
             ushort fxGrh = buf.ReadShort();
-            // TODO: FXManager.Instance.PlayFX(id, fxGrh)
-            Debug.Log($"[Net] FX {fxGrh} sobre entidad {id}");
+            Renderer.FXManager.Instance?.PlayFX(id, fxGrh);
         }
 
         public void OnPlaySound(ByteBuffer buf)
