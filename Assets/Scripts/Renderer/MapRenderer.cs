@@ -41,6 +41,18 @@ namespace ArgentumOnline.Renderer
 
         void Awake() => Instance = this;
 
+        // Redibuja en el Editor cuando cambiás un valor en el Inspector (Play mode)
+        void OnValidate()
+        {
+            if (Application.isPlaying && _currentMap != null)
+            {
+                _lastCenterX = -1;
+                _lastCenterY = -1;
+                var p = Game.GameState.Instance?.LocalPlayer;
+                if (p != null) UpdateViewport(p.PosX, p.PosY);
+            }
+        }
+
         // ── API pública ───────────────────────────────────────────────────────
 
         public void SetMap(MapGrid map)

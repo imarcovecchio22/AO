@@ -20,10 +20,10 @@ namespace ArgentumOnline.UI
         private bool       _isOpen;
 
         // Colores
-        private static readonly Color BgPanel    = new Color(0.07f, 0.05f, 0.12f, 0.97f);
-        private static readonly Color BgRow      = new Color(0.15f, 0.10f, 0.25f, 1f);
-        private static readonly Color BgSelected = new Color(0.40f, 0.20f, 0.70f, 1f);
-        private static readonly Color BgInactive = new Color(0.25f, 0.18f, 0.10f, 1f);
+        private static readonly Color BgPanel    = new Color(0.05f, 0.05f, 0.05f, 0.55f);
+        private static readonly Color BgRow      = new Color(0.10f, 0.10f, 0.10f, 0.60f);
+        private static readonly Color BgSelected = new Color(0.20f, 0.20f, 0.20f, 0.85f);
+        private static readonly Color BgInactive = new Color(0.08f, 0.08f, 0.08f, 0.45f);
         private static readonly Color ColGold    = new Color(0.92f, 0.80f, 0.45f, 1f);
         private static readonly Color ColMana    = new Color(0.50f, 0.75f, 1.00f, 1f);
         private static readonly Color ColWhite   = new Color(0.95f, 0.95f, 0.95f, 1f);
@@ -88,7 +88,7 @@ namespace ArgentumOnline.UI
             panelImg.color = BgPanel;
             panelImg.raycastTarget = true;
 
-            AddOutline(_panel, new Color(0.55f, 0.30f, 0.90f, 0.6f));
+            AddOutline(_panel, new Color(0.30f, 0.30f, 0.30f, 0.5f));
 
             // Header "HECHIZOS"
             var header   = MakeRect("Header", _panel.transform);
@@ -100,7 +100,7 @@ namespace ArgentumOnline.UI
             headerRt.sizeDelta        = new Vector2(0, HeaderH);
 
             var headerImg = header.AddComponent<Image>();
-            headerImg.color = new Color(0.25f, 0.10f, 0.45f, 1f);
+            headerImg.color = new Color(0.10f, 0.10f, 0.10f, 0.75f);
 
             var title = MakeRect("Title", header.transform);
             var titleRt = title.GetComponent<RectTransform>();
