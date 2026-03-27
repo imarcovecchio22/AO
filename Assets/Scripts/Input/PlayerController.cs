@@ -102,25 +102,27 @@ namespace ArgentumOnline.Input
 
         private void HandleClick()
         {
-            Vector2 screenPos = Vector2.zero;
-            bool clicked = false;
-
+            // Click izquierdo → interacción (NPC, puertas)
             if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
             {
-                screenPos = Mouse.current.position.ReadValue();
-                clicked   = true;
+                var screenPos = Mouse.current.position.ReadValue();
+                if (!IsBlockedByUI(screenPos)) SendClickAt(screenPos);
             }
-            else if (Touchscreen.current != null &&
-                     Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+
+            // Click derecho → teletransporte al tile
+            if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
             {
-                screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
-                clicked   = true;
+                var screenPos = Mouse.current.position.ReadValue();
+                if (!IsBlockedByUI(screenPos)) SendMoveToAt(screenPos);
             }
 
-            if (!clicked) return;
-            if (IsBlockedByUI(screenPos)) return;
-
-            SendClickAt(screenPos);
+            // Touch (móvil) → interacción
+            if (Touchscreen.current != null &&
+                Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+            {
+                var screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
+                if (!IsBlockedByUI(screenPos)) SendClickAt(screenPos);
+            }
         }
 
         /// <summary>
@@ -144,6 +146,20 @@ namespace ArgentumOnline.Input
                 if (canvas != null && canvas.sortingOrder > 10) return true;
             }
             return false;
+        }
+
+        private void SendMoveToAt(Vector2 screenPos)
+        {
+            if (!NetworkManager.Instance.IsConnected) return;
+
+            var world = Camera.main.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
+            var p  = GameState.Instance.LocalPlayer;
+            int dx = Mathf.RoundToInt(world.x);
+            int dy = Mathf.RoundToInt(-world.y);
+            int absX = Mathf.Clamp(p.PosX + dx, 1, 100);
+            int absY = Mathf.Clamp(p.PosY + dy, 1, 100);
+
+            NetworkManager.Instance.Send(PacketSerializer.Instance.MoveTo((byte)absX, (byte)absY));
         }
 
         private void SendClickAt(Vector2 screenPos)

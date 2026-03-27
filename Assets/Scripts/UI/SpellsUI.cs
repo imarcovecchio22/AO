@@ -105,7 +105,8 @@ namespace ArgentumOnline.UI
             var title = MakeRect("Title", header.transform);
             var titleRt = title.GetComponent<RectTransform>();
             titleRt.anchorMin = Vector2.zero;
-            titleRt.anchorMax = Vector2.one;
+            titleRt.anchorMax = new Vector2(1f, 1f);
+            titleRt.offsetMax = new Vector2(-44f, 0f); // deja espacio al botón ✕
             var titleTxt = title.AddComponent<Text>();
             titleTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             titleTxt.text      = "HECHIZOS";
@@ -121,9 +122,9 @@ namespace ArgentumOnline.UI
             closeRt.anchorMax        = new Vector2(1, 0.5f);
             closeRt.pivot            = new Vector2(1, 0.5f);
             closeRt.anchoredPosition = new Vector2(-6f, 0f);
-            closeRt.sizeDelta        = new Vector2(32, 32);
+            closeRt.sizeDelta        = new Vector2(36, 36);
             var closeImg = closeGo.AddComponent<Image>();
-            closeImg.color = new Color(0.6f, 0.1f, 0.1f, 0.8f);
+            closeImg.color = new Color(0.85f, 0.15f, 0.15f, 0.95f);
             var closeBtn = closeGo.AddComponent<Button>();
             closeBtn.onClick.AddListener(Close);
             var closeTxt = MakeRect("X", closeGo.transform);

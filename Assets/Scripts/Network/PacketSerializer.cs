@@ -144,6 +144,12 @@ namespace ArgentumOnline.Network
                 .WriteShort(cantidad)
                 .Build();
 
+        public byte[] MoveTo(byte x, byte y)
+            => Start(ClientPacketID.MoveTo)
+                .WriteByte(x)
+                .WriteByte(y)
+                .Build();
+
         public byte[] ChangeSeguro()
             => Start(ClientPacketID.ChangeSeguro)
                 .Build();

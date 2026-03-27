@@ -13,12 +13,12 @@ namespace ArgentumOnline.UI
     /// </summary>
     public class ConsoleUI : MonoBehaviour
     {
-        private const int   MaxLines   = 8;
-        private const float LineH      = 18f;
-        private const float PanelW     = 380f;
+        private const int   MaxLines   = 3;
+        private const float LineH      = 16f;
+        private const float PanelW     = 624f;  // entre HUD (x=256+8) y minimap (x=896-8)
         private const float InputH     = 22f;
         private const float MsgAreaH   = MaxLines * LineH;
-        private const float PanelH     = MsgAreaH + InputH + 10f;
+        private const float PanelH     = MsgAreaH + InputH + 8f;
         private const float PadX       = 8f;
 
         // Líneas de texto circulares (índice 0 = más antigua visible)
@@ -54,12 +54,12 @@ namespace ArgentumOnline.UI
 
             if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
             {
-                if (_inputRow.activeSelf && _inputField.isFocused)
+                if (_inputField.isFocused)
                     TrySend();
                 else
                     OpenInput();
             }
-            if (kb.escapeKey.wasPressedThisFrame && _inputRow.activeSelf)
+            if (kb.escapeKey.wasPressedThisFrame && _inputField.isFocused)
                 CloseInput();
         }
 
@@ -77,14 +77,15 @@ namespace ArgentumOnline.UI
             canvasGo.AddComponent<GraphicRaycaster>();
             DontDestroyOnLoad(canvasGo);
 
-            // Panel principal — esquina superior derecha, debajo del HUD de vida
-            // HUD ocupa 70px + 18px de margen = 88px desde arriba
+            // Panel principal — entre HUD (right=264) y minimap (left=888), al tope de pantalla
+            // HUD: anchoredPos(16,-16) + sizeDelta(240,114) → right edge x=256, gap 8 → start x=264
+            // Minimap: anchoredPos(-16,-16) desde right, ancho=168 → left edge x=896, gap 8 → end x=888
             var panel     = Go("Panel", canvasGo.transform);
             var panelRect = panel.GetComponent<RectTransform>();
-            panelRect.anchorMin        = new Vector2(1, 1);
-            panelRect.anchorMax        = new Vector2(1, 1);
-            panelRect.pivot            = new Vector2(1, 1);
-            panelRect.anchoredPosition = new Vector2(-18, -96f);
+            panelRect.anchorMin        = new Vector2(0, 1);
+            panelRect.anchorMax        = new Vector2(0, 1);
+            panelRect.pivot            = new Vector2(0, 1);
+            panelRect.anchoredPosition = new Vector2(264, -16f);
             panelRect.sizeDelta        = new Vector2(PanelW, PanelH);
 
             var bg = panel.AddComponent<Image>();
@@ -121,7 +122,7 @@ namespace ArgentumOnline.UI
 
                 var txt = lineGo.AddComponent<Text>();
                 txt.font               = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                txt.fontSize           = 12;
+                txt.fontSize           = 11;
                 txt.color              = Color.clear;
                 txt.horizontalOverflow = HorizontalWrapMode.Overflow;
                 txt.verticalOverflow   = VerticalWrapMode.Truncate;
@@ -177,7 +178,7 @@ namespace ArgentumOnline.UI
             ph.text      = "Enter para chatear...";
             _inputField.placeholder = ph;
 
-            _inputRow.SetActive(false);
+            // La barra de input siempre visible como hint; se activa al presionar Enter
         }
 
         // ── Mensajes ──────────────────────────────────────────────────────────
@@ -206,14 +207,13 @@ namespace ArgentumOnline.UI
 
         private void OpenInput()
         {
-            _inputRow.SetActive(true);
             _inputField.ActivateInputField();
         }
 
         private void CloseInput()
         {
             _inputField.text = "";
-            _inputRow.SetActive(false);
+            _inputField.DeactivateInputField();
         }
 
         private void OnEndEdit(string text)

@@ -439,7 +439,7 @@ namespace ArgentumOnline.Network.Handlers
             ushort idMap  = buf.ReadShort();
             byte   posX   = buf.ReadByte();
             byte   posY   = buf.ReadByte();
-            // TODO: MapManager.Instance.SetGroundItem(idMap, posX, posY, idItem)
+            Renderer.MapRenderer.Instance?.SetTileObj(idMap, posX, posY, (int)idItem);
         }
 
         public void OnDeleteItem(ByteBuffer buf)
@@ -447,7 +447,7 @@ namespace ArgentumOnline.Network.Handlers
             ushort idMap = buf.ReadShort();
             byte   posX  = buf.ReadByte();
             byte   posY  = buf.ReadByte();
-            // TODO: MapManager.Instance.ClearGroundItem(idMap, posX, posY)
+            Renderer.MapRenderer.Instance?.SetTileObj(idMap, posX, posY, 0);
         }
 
         public void OnBlockMap(ByteBuffer buf)

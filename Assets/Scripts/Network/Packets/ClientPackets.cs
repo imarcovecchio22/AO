@@ -20,6 +20,7 @@ namespace ArgentumOnline.Network
         AgarrarItem      = 13,  // (sin campos)
         BuyItem          = 14,  // byte idPos, ushort cant
         SellItem         = 15,  // byte idPos, ushort cant
+        MoveTo           = 16,  // byte x, byte y (teleport al tile clickeado)
         ChangeSeguro     = 17,  // (sin campos, toggle seguro PvP)
     }
 

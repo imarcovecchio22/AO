@@ -58,6 +58,14 @@ namespace ArgentumOnline.Renderer
             _localPlayerView.Refresh();
             // El jugador local siempre está en el centro del viewport (0,0)
             _localPlayerView.SetTilePosition(0, 0);
+
+            // Nombre propio debajo del sprite (otros jugadores lo tienen arriba)
+            if (_localPlayerView.NameLabel != null)
+            {
+                _localPlayerView.NameLabel.transform.localPosition = new Vector3(0, -0.85f, 0);
+                _localPlayerView.NameLabel.anchor = TextAnchor.UpperCenter;
+                _localPlayerView.NameLabel.color  = new Color(0.90f, 0.85f, 0.45f, 1f); // dorado
+            }
         }
 
         private void RefreshLocalPlayer()

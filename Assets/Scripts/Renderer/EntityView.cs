@@ -261,7 +261,7 @@ namespace ArgentumOnline.Renderer
             bgRt.anchorMax = Vector2.one;
             bgRt.offsetMin = bgRt.offsetMax = Vector2.zero;
             var bgImg = bgGo.AddComponent<Image>();
-            bgImg.color = new Color(0.04f, 0.04f, 0.10f, 0.88f);
+            bgImg.color = Color.clear;
 
             // Texto del mensaje
             var txtGo  = new GameObject("Text");
@@ -290,15 +290,13 @@ namespace ArgentumOnline.Renderer
             // Fade out en 0.6 s
             float elapsed  = 0f;
             float fadeTime = 0.6f;
-            Color bgStart  = bgImg.color;
             Color txStart  = txt.color;
 
             while (elapsed < fadeTime)
             {
                 elapsed += Time.deltaTime;
                 float a = 1f - (elapsed / fadeTime);
-                bgImg.color = new Color(bgStart.r, bgStart.g, bgStart.b, bgStart.a * a);
-                txt.color   = new Color(txStart.r, txStart.g, txStart.b, txStart.a * a);
+                txt.color = new Color(txStart.r, txStart.g, txStart.b, txStart.a * a);
                 yield return null;
             }
 

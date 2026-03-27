@@ -31,6 +31,7 @@ namespace ArgentumOnline.Renderer
             // 1. Cargar assets en paralelo con el login
             yield return StartCoroutine(GrhDatabase.Instance.Initialize());
             yield return StartCoroutine(EntityDatabase.Instance.Initialize());
+            yield return StartCoroutine(ObjDatabase.Instance.Initialize());
 
             // 2. Mostrar login y esperar selección de personaje
             LoginUI.Instance.OnCharacterSelected += OnCharacterSelected;

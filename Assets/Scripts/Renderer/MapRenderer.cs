@@ -35,11 +35,27 @@ namespace ArgentumOnline.Renderer
         private readonly string[] _layers    = { "1", "2", "3", "4" };
         private readonly int[]    _sortOrders = { 0, 1, 2, 10 };
 
+        // Sprites de objetos dinámicos (puertas, items en el suelo) — por tile (dx,dy)
+        private readonly Dictionary<(int,int), SpriteRenderer> _objSprites = new();
+
         private MapGrid _currentMap;
         private int     _lastCenterX = -1;
         private int     _lastCenterY = -1;
 
+        // Fade de techos
+        private float _roofAlpha       = 1f;
+        private float _roofAlphaTarget = 1f;
+        private const float RoofFadeSpeed = 4f;   // unidades/segundo
+
         void Awake() => Instance = this;
+
+        void Update()
+        {
+            if (Mathf.Approximately(_roofAlpha, _roofAlphaTarget)) return;
+            _roofAlpha = Mathf.MoveTowards(_roofAlpha, _roofAlphaTarget, RoofFadeSpeed * Time.deltaTime);
+            foreach (var sr in GetPool("4"))
+                if (sr.enabled) sr.color = new Color(1f, 1f, 1f, _roofAlpha);
+        }
 
         // Redibuja en el Editor cuando cambiás un valor en el Inspector (Play mode)
         void OnValidate()
@@ -60,6 +76,64 @@ namespace ArgentumOnline.Renderer
             _currentMap  = map;
             _lastCenterX = -1;
             _lastCenterY = -1;
+            // Limpiar objetos dinámicos del mapa anterior
+            foreach (var sr in _objSprites.Values)
+                if (sr != null) sr.enabled = false;
+            _objSprites.Clear();
+        }
+
+        /// <summary>
+        /// Actualiza el objeto en una celda del mapa (puertas, items).
+        /// Llamar cuando el servidor envía renderItem o deleteItem.
+        /// </summary>
+        public void SetTileObj(int mapNum, int x, int y, int itemId)
+        {
+            if (_currentMap == null || _currentMap.MapNumber != mapNum) return;
+            var cell = _currentMap.GetCell(x, y);
+            if (cell == null) return;
+
+            cell.objIndex = itemId;
+
+            int dx = x - _lastCenterX;
+            int dy = y - _lastCenterY;
+
+            if (itemId <= 0)
+            {
+                if (_objSprites.TryGetValue((dx, dy), out var sr)) sr.enabled = false;
+                return;
+            }
+
+            int grhIndex = ObjDatabase.Instance?.GetGrhIndex(itemId) ?? 0;
+            if (grhIndex <= 0)
+            {
+                if (_objSprites.TryGetValue((dx, dy), out var sr)) sr.enabled = false;
+                return;
+            }
+
+            var renderer = GetOrCreateObjSprite(dx, dy);
+            renderer.enabled = true;
+            GrhDatabase.Instance.GetSprite(grhIndex, sprite =>
+            {
+                if (renderer == null || sprite == null) return;
+                renderer.sprite = sprite;
+                float w = sprite.rect.width  / 32f;
+                float h = sprite.rect.height / 32f;
+                renderer.transform.localPosition = new Vector3(
+                    dx * tileSize + overlayOffsetX,
+                    -dy * tileSize + overlayOffsetY + h * 0.5f,
+                    0);
+            });
+        }
+
+        private SpriteRenderer GetOrCreateObjSprite(int dx, int dy)
+        {
+            if (_objSprites.TryGetValue((dx, dy), out var sr)) return sr;
+            var go = new GameObject($"Obj_{dx}_{dy}");
+            go.transform.SetParent(transform);
+            sr = go.AddComponent<SpriteRenderer>();
+            sr.sortingOrder = 5;
+            _objSprites[(dx, dy)] = sr;
+            return sr;
         }
 
         /// <summary>
@@ -73,6 +147,13 @@ namespace ArgentumOnline.Renderer
             _lastCenterX = centerX;
             _lastCenterY = centerY;
 
+            // ¿El jugador está bajo un techo? (capa 4 en su propia celda)
+            var playerCell = _currentMap.GetCell(centerX, centerY);
+            bool underRoof = playerCell != null
+                          && playerCell.graphics.TryGetValue("4", out int roofGrh)
+                          && roofGrh > 0;
+            _roofAlphaTarget = underRoof ? 0f : 1f;
+
             RenderViewport(centerX, centerY);
         }
 
@@ -83,6 +164,10 @@ namespace ArgentumOnline.Renderer
             foreach (var layer in _layers)
                 foreach (var sr in GetPool(layer))
                     sr.enabled = false;
+
+            // Ocultar todos los obj sprites; se volverán a mostrar los que tengan objIndex
+            foreach (var sr in _objSprites.Values)
+                if (sr != null) sr.enabled = false;
 
             int poolIdx      = 0;
             int renderRadius = viewportRadius + 1;
@@ -95,6 +180,32 @@ namespace ArgentumOnline.Renderer
 
                 var cell = _currentMap.GetCell(mapX, mapY);
                 if (cell == null) { poolIdx++; continue; }
+
+                // Objetos dinámicos (puertas, items en el suelo)
+                if (cell.objIndex > 0)
+                {
+                    int grhIndex = ObjDatabase.Instance?.GetGrhIndex(cell.objIndex) ?? 0;
+                    if (grhIndex > 0)
+                    {
+                        var objSr     = GetOrCreateObjSprite(dx, dy);
+                        objSr.enabled = true;
+                        int capturedGrh = grhIndex;
+                        float capturedDxF = dx * tileSize;
+                        float capturedDyF = dy * tileSize;
+                        SpriteRenderer capturedObj = objSr;
+                        GrhDatabase.Instance.GetSprite(capturedGrh, sprite =>
+                        {
+                            if (capturedObj == null || sprite == null) return;
+                            capturedObj.sprite = sprite;
+                            float w = sprite.rect.width  / 32f;
+                            float h = sprite.rect.height / 32f;
+                            capturedObj.transform.localPosition = new Vector3(
+                                capturedDxF + overlayOffsetX,
+                                -capturedDyF + overlayOffsetY + h * 0.5f,
+                                0);
+                        });
+                    }
+                }
 
                 for (int li = 0; li < _layers.Length; li++)
                 {
@@ -111,11 +222,14 @@ namespace ArgentumOnline.Renderer
                     float          capturedDx  = dx * tileSize;
                     float          capturedDy  = dy * tileSize;
                     bool           isOverlay   = li >= 2;   // layer "3" o "4"
+                    bool           isRoof      = li == 3;   // layer "4"
+                    float          capturedAlpha = isRoof ? _roofAlpha : 1f;
                     GrhDatabase.Instance.GetSprite(capturedGrh, sprite =>
                     {
                         if (capturedSr == null) return;
                         if (sprite == null) { capturedSr.enabled = false; return; }
-                        capturedSr.sprite               = sprite;
+                        capturedSr.sprite = sprite;
+                        capturedSr.color  = new Color(1f, 1f, 1f, capturedAlpha);
                         capturedSr.transform.localScale = Vector3.one;
 
                         float w = sprite.rect.width  / 32f;
