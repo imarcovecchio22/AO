@@ -236,7 +236,7 @@ namespace ArgentumOnline.UI
         {
             var p = GameState.Instance.LocalPlayer;
             if (p == null || _coordText == null) return;
-            _coordText.text = $"X:{p.PosX}  Y:{p.PosY}";
+            _coordText.text = $"Mapa:{p.Map}  X:{p.PosX}  Y:{p.PosY}";
         }
 
         // ── Helpers de textura ────────────────────────────────────────────────
