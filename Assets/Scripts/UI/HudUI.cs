@@ -17,6 +17,7 @@ namespace ArgentumOnline.UI
         private Text   _hpText;
         private Text   _manaText;
         private Text   _mapNameText;
+        private Text   _coordText;
 
         private static readonly Color HpColor   = new Color(0.82f, 0.15f, 0.15f, 1f);
         private static readonly Color ManaColor = new Color(0.18f, 0.70f, 0.80f, 1f);
@@ -32,16 +33,21 @@ namespace ArgentumOnline.UI
 
         void OnDestroy()
         {
-            GameState.Instance.OnConnected    -= Subscribe;
+            GameState.Instance.OnConnected     -= Subscribe;
             GameState.Instance.OnMapNameChanged -= OnMapName;
             if (GameState.Instance.LocalPlayer != null)
-                GameState.Instance.LocalPlayer.OnStatsChanged -= Refresh;
+            {
+                GameState.Instance.LocalPlayer.OnStatsChanged    -= Refresh;
+                GameState.Instance.LocalPlayer.OnPositionChanged -= RefreshCoords;
+            }
         }
 
         private void Subscribe()
         {
-            GameState.Instance.LocalPlayer.OnStatsChanged += Refresh;
+            GameState.Instance.LocalPlayer.OnStatsChanged    += Refresh;
+            GameState.Instance.LocalPlayer.OnPositionChanged += RefreshCoords;
             Refresh();
+            RefreshCoords();
         }
 
         private void OnMapName(string name)
@@ -70,7 +76,7 @@ namespace ArgentumOnline.UI
             containerRt.anchorMax        = new Vector2(0, 1);
             containerRt.pivot            = new Vector2(0, 1);
             containerRt.anchoredPosition = new Vector2(16, -16);
-            containerRt.sizeDelta        = new Vector2(240, 90);
+            containerRt.sizeDelta        = new Vector2(240, 114);
 
             _hpFill   = BuildBar(container.transform, 0, HpColor,   "#", out _hpText);
             _manaFill = BuildBar(container.transform, 1, ManaColor, "~", out _manaText);
@@ -91,6 +97,23 @@ namespace ArgentumOnline.UI
             var mapSh = mapNameGo.AddComponent<Shadow>();
             mapSh.effectColor    = new Color(0, 0, 0, 0.9f);
             mapSh.effectDistance = new Vector2(1, -1);
+
+            // Coordenadas X/Y debajo del nombre del mapa
+            var coordGo = MakeRect("Coords", container.transform);
+            var coordRt = coordGo.GetComponent<RectTransform>();
+            coordRt.anchorMin        = new Vector2(0, 0);
+            coordRt.anchorMax        = new Vector2(1, 0);
+            coordRt.pivot            = new Vector2(0, 1);
+            coordRt.anchoredPosition = new Vector2(0, -28);
+            coordRt.sizeDelta        = new Vector2(0, 20);
+            _coordText = coordGo.AddComponent<Text>();
+            _coordText.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _coordText.fontSize  = 14;
+            _coordText.color     = new Color(0.80f, 0.80f, 0.80f, 0.70f);
+            _coordText.alignment = TextAnchor.MiddleLeft;
+            var coordSh = coordGo.AddComponent<Shadow>();
+            coordSh.effectColor    = new Color(0, 0, 0, 0.9f);
+            coordSh.effectDistance = new Vector2(1, -1);
         }
 
         /// <summary>
@@ -207,6 +230,13 @@ namespace ArgentumOnline.UI
                 _hpText.text   = $"{p.HP} / {p.MaxHP}";
             if (_manaText != null)
                 _manaText.text = $"{p.Mana} / {p.MaxMana}";
+        }
+
+        private void RefreshCoords()
+        {
+            var p = GameState.Instance.LocalPlayer;
+            if (p == null || _coordText == null) return;
+            _coordText.text = $"X:{p.PosX}  Y:{p.PosY}";
         }
 
         // ── Helpers de textura ────────────────────────────────────────────────

@@ -19,12 +19,9 @@ namespace ArgentumOnline.Renderer
         /// </summary>
         public void PlayFX(long entityId, ushort fxGrh)
         {
-            if (fxGrh == 0) return;
-
-            var entityTransform = EntityRenderer.Instance?.GetEntityTransform(entityId);
-            Vector3 pos = entityTransform != null ? entityTransform.position : Vector3.zero;
-
-            StartCoroutine(PlayFXRoutine(pos, fxGrh));
+            // fxGrh es un ID del sistema FX del AO original (no un índice de GrhDatabase).
+            // Sin la tabla de mapeo FX→GRH no podemos renderizar el efecto correcto.
+            // TODO: cargar fx_mapping.json cuando esté disponible.
         }
 
         private IEnumerator PlayFXRoutine(Vector3 worldPos, ushort fxGrh)
