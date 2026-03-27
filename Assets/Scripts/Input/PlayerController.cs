@@ -158,6 +158,18 @@ namespace ArgentumOnline.Input
             int absX = Mathf.Clamp(p.PosX + dx, 1, 100);
             int absY = Mathf.Clamp(p.PosY + dy, 1, 100);
 
+            // Si hay hechizo seleccionado, lanzarlo en lugar del click normal
+            var spellsUI = ArgentumOnline.UI.SpellsUI.Instance;
+            if (spellsUI != null && spellsUI.SelectedSpellSlot >= 0)
+            {
+                NetworkManager.Instance.Send(
+                    PacketSerializer.Instance.AttackSpell(
+                        (byte)spellsUI.SelectedSpellSlot,
+                        (byte)absX, (byte)absY));
+                spellsUI.ClearSelection();
+                return;
+            }
+
             NetworkManager.Instance.Send(PacketSerializer.Instance.Click((byte)absX, (byte)absY));
         }
 

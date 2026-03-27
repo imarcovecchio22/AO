@@ -106,7 +106,7 @@ namespace ArgentumOnline.UI
 
         private void OnSpells()
         {
-            // TODO: SpellsUI toggle
+            SpellsUI.Instance?.Toggle();
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
