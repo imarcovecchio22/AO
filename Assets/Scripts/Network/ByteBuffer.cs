@@ -56,18 +56,31 @@ namespace ArgentumOnline.Network
         public long ReadId() => (long)ReadDouble();
 
         /// <summary>
-        /// Strings: uint16 con cantidad de chars UTF-8, luego los bytes.
-        /// Para ASCII es 1:1. Para caracteres especiales (tildes, ñ) puede diferir.
+        /// Strings: uint16 con cantidad de codepoints UTF-8, luego los bytes UTF-8.
+        /// El servidor escribe el número de codepoints (no bytes), por lo que para
+        /// caracteres multibyte (tildes, ñ) hay que escanear byte a byte.
         /// </summary>
         public string ReadString()
         {
             ushort charCount = ReadShort();
             if (charCount == 0) return string.Empty;
-            int available = _data.Length - _readPos;
-            if (charCount > available) return string.Empty;
-            byte[] raw = new byte[charCount];
-            Buffer.BlockCopy(_data, _readPos, raw, 0, charCount);
-            _readPos += charCount;
+
+            // Calcular cuántos bytes corresponden a charCount codepoints UTF-8
+            int byteCount = 0;
+            int pos = _readPos;
+            for (int i = 0; i < charCount && pos < _data.Length; i++)
+            {
+                byte b = _data[pos];
+                int seqLen = b < 0x80 ? 1 : b < 0xE0 ? 2 : b < 0xF0 ? 3 : 4;
+                byteCount += seqLen;
+                pos += seqLen;
+            }
+
+            if (byteCount > _data.Length - _readPos) return string.Empty;
+
+            byte[] raw = new byte[byteCount];
+            Buffer.BlockCopy(_data, _readPos, raw, 0, byteCount);
+            _readPos += byteCount;
             return Encoding.UTF8.GetString(raw);
         }
     }

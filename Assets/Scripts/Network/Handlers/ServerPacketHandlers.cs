@@ -474,28 +474,39 @@ namespace ArgentumOnline.Network.Handlers
         public void OnOpenTrade(ByteBuffer buf)
         {
             byte npcCount = buf.ReadByte();
-            for (int i = 0; i < npcCount; i++)
+            var npcItems  = new Game.NpcTradeItem[npcCount];
+            for (byte i = 0; i < npcCount; i++)
             {
-                ushort grhIndex       = buf.ReadShort();
-                string name           = buf.ReadString();
-                ushort cant           = buf.ReadShort();
-                uint   valor          = buf.ReadInt();
-                byte   validParaClase = buf.ReadByte();
-                string dataObj        = buf.ReadString();
+                npcItems[i] = new Game.NpcTradeItem
+                {
+                    IdPos          = i,
+                    GrhIndex       = buf.ReadShort(),
+                    Name           = buf.ReadString(),
+                    Cantidad       = buf.ReadShort(),
+                    Valor          = buf.ReadInt(),
+                    ValidParaClase = buf.ReadByte() == 1,
+                    DataObj        = buf.ReadString(),
+                };
             }
+
             byte userCount = buf.ReadByte();
+            var userItems  = new Game.UserTradeItem[userCount];
             for (int i = 0; i < userCount; i++)
             {
-                ushort grhIndex       = buf.ReadShort();
-                string name           = buf.ReadString();
-                ushort cant           = buf.ReadShort();
-                uint   valorVenta     = buf.ReadInt();
-                byte   equipped       = buf.ReadByte();
-                byte   idPos          = buf.ReadByte();
-                byte   validParaClase = buf.ReadByte();
-                string dataObj        = buf.ReadString();
+                userItems[i] = new Game.UserTradeItem
+                {
+                    GrhIndex       = buf.ReadShort(),
+                    Name           = buf.ReadString(),
+                    Cantidad       = buf.ReadShort(),
+                    ValorVenta     = buf.ReadInt(),
+                    Equipped       = buf.ReadByte() == 1,
+                    IdPos          = buf.ReadByte(),
+                    ValidParaClase = buf.ReadByte() == 1,
+                    DataObj        = buf.ReadString(),
+                };
             }
-            // TODO: UIManager.Instance.OpenTradeModal(...)
+
+            GS.OpenTrade(new Game.TradeData { NpcItems = npcItems, UserItems = userItems });
         }
 
         public void OnAprenderSpell(ByteBuffer buf)

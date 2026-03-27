@@ -31,6 +31,7 @@ namespace ArgentumOnline.Game
         public event Action<string>          OnMapNameChanged;
         public event Action<ushort>          OnOnlineCountChanged;
         public event Action                  OnConnected;      // recibido GetMyCharacter
+        public event Action<TradeData>       OnTradeOpen;
 
         // ── Init del jugador local (paquete 1 - GetMyCharacter) ───────────────
 
@@ -75,6 +76,8 @@ namespace ArgentumOnline.Game
             p.NotifyStatsChanged();
             OnConnected?.Invoke();
         }
+
+        public void OpenTrade(TradeData data) => OnTradeOpen?.Invoke(data);
 
         // ── Entidades ─────────────────────────────────────────────────────────
 
