@@ -34,35 +34,25 @@ namespace ArgentumOnline.Renderer
             volume.profile = profile;
 
             // ── Bloom ─────────────────────────────────────────────────────────
-            // Sutil: ilumina los píxeles más brillantes (tiles iluminados, FX)
-            if (profile.TryAdd<Bloom>(out var bloom, true))
-            {
-                bloom.active = true;
-                bloom.intensity.Override(0.55f);
-                bloom.threshold.Override(0.80f);
-                bloom.scatter.Override(0.65f);
-            }
+            var bloom = profile.Add<Bloom>(true);
+            bloom.active = true;
+            bloom.intensity.Override(0.55f);
+            bloom.threshold.Override(0.80f);
+            bloom.scatter.Override(0.65f);
 
             // ── Color Adjustments ─────────────────────────────────────────────
-            // Satura y da contraste sin quemar los sprites de pixel art
-            if (profile.TryAdd<ColorAdjustments>(out var color, true))
-            {
-                color.active = true;
-                color.postExposure.Override(0.10f);    // +10% brillo global
-                color.contrast.Override(18f);          // +18% contraste
-                color.saturation.Override(22f);        // +22% saturación
-                // Tinte cálido levísimo (paja/tarde de verano)
-                color.colorFilter.Override(new Color(1f, 0.97f, 0.92f));
-            }
+            var color = profile.Add<ColorAdjustments>(true);
+            color.active = true;
+            color.postExposure.Override(0.10f);
+            color.contrast.Override(18f);
+            color.saturation.Override(22f);
+            color.colorFilter.Override(new Color(1f, 0.97f, 0.92f));
 
             // ── Vignette ──────────────────────────────────────────────────────
-            // Oscurece los bordes para focalizar la mirada en el centro
-            if (profile.TryAdd<Vignette>(out var vignette, true))
-            {
-                vignette.active = true;
-                vignette.intensity.Override(0.28f);
-                vignette.smoothness.Override(0.55f);
-            }
+            var vignette = profile.Add<Vignette>(true);
+            vignette.active = true;
+            vignette.intensity.Override(0.28f);
+            vignette.smoothness.Override(0.55f);
         }
 
         /// <summary>
