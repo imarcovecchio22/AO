@@ -10,12 +10,16 @@ namespace ArgentumOnline.Renderer
     /// </summary>
     public class EntityView : MonoBehaviour
     {
-        // Capas en orden de sortingOrder
+        // Capas principales (material default)
         public SpriteRenderer BodyRenderer;
         public SpriteRenderer HeadRenderer;
         public SpriteRenderer HelmetRenderer;
         public SpriteRenderer WeaponRenderer;
         public SpriteRenderer ShieldRenderer;
+
+        // Capas de outline: mismo sprite, escalado 1.1x, color negro, sortingOrder-1
+        private SpriteRenderer _bodyOutline;
+        private SpriteRenderer _headOutline;
 
         // Nombre flotante
         public TextMesh NameLabel;
@@ -45,8 +49,11 @@ namespace ArgentumOnline.Renderer
         // Offset vertical para que los pies queden al nivel del tile (y=0).
         private const float CharYOffset = 0.7f;   // ≈ mitad de la altura típica del body
 
-        private static Sprite   _shadowSprite;
-        private static Material _outlineMat;   // compartido entre todas las entidades
+        private static Sprite _shadowSprite;
+
+        // Color del outline (negro semi-transparente)
+        private static readonly Color OutlineColor = new Color(0f, 0f, 0f, 0.75f);
+        private const float OutlineScale = 1.10f;   // 10% más grande que el sprite
 
         public static EntityView Create(long entityId, string entityName, Transform parent)
         {
@@ -56,27 +63,19 @@ namespace ArgentumOnline.Renderer
             var view = go.AddComponent<EntityView>();
             view.EntityId = entityId;
 
-            // Material de outline (creado una sola vez, compartido entre entidades)
-            if (_outlineMat == null)
-            {
-                var shader = Shader.Find("Custom/SpriteOutline");
-                if (shader != null)
-                {
-                    _outlineMat = new Material(shader);
-                    _outlineMat.SetColor("_OutlineColor", new Color(0f, 0f, 0f, 0.80f));
-                    _outlineMat.SetFloat("_OutlineSize",  1f);
-                }
-            }
-
-            // Sombra elíptica al nivel del suelo (antes que los demás layers)
+            // Sombra elíptica al nivel del suelo
             view.AddShadow(go);
 
+            // Outline del body (detrás, sortingOrder-1, escalado)
+            view._bodyOutline = CreateOutline(go, "BodyOutline", 0, CharYOffset);
+            view._headOutline = CreateOutline(go, "HeadOutline", 1, CharYOffset);
+
             // Capas del personaje elevadas para que los pies toquen el suelo
-            view.BodyRenderer   = CreateLayer(go, "Body",   0, CharYOffset, _outlineMat);
-            view.HeadRenderer   = CreateLayer(go, "Head",   1, CharYOffset, _outlineMat);
-            view.HelmetRenderer = CreateLayer(go, "Helmet", 2, CharYOffset, _outlineMat);
-            view.WeaponRenderer = CreateLayer(go, "Weapon", 3, CharYOffset, _outlineMat);
-            view.ShieldRenderer = CreateLayer(go, "Shield", 4, CharYOffset, _outlineMat);
+            view.BodyRenderer   = CreateLayer(go, "Body",   0, CharYOffset);
+            view.HeadRenderer   = CreateLayer(go, "Head",   1, CharYOffset);
+            view.HelmetRenderer = CreateLayer(go, "Helmet", 2, CharYOffset);
+            view.WeaponRenderer = CreateLayer(go, "Weapon", 3, CharYOffset);
+            view.ShieldRenderer = CreateLayer(go, "Shield", 4, CharYOffset);
 
             // Nombre flotante — encima del personaje
             var labelGo = new GameObject("Label");
@@ -131,44 +130,63 @@ namespace ArgentumOnline.Renderer
         }
 
         private static SpriteRenderer CreateLayer(GameObject parent, string name,
-                                                   int layerOffset, float yOffset = 0f,
-                                                   Material mat = null)
+                                                   int layerOffset, float yOffset = 0f)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent.transform);
             go.transform.localPosition = new Vector3(0, yOffset, 0);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sortingOrder = _sortBase + layerOffset;
-            if (mat != null) sr.sharedMaterial = mat;
+            return sr;
+        }
+
+        // Crea un SpriteRenderer de outline: escalado, color negro, sortingOrder detrás del main
+        private static SpriteRenderer CreateOutline(GameObject parent, string name,
+                                                    int layerOffset, float yOffset)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent.transform);
+            go.transform.localPosition = new Vector3(0, yOffset, 0);
+            go.transform.localScale    = new Vector3(OutlineScale, OutlineScale, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sortingOrder = _sortBase + layerOffset - 1;
+            sr.color        = OutlineColor;
             return sr;
         }
 
         /// <summary>Actualiza todos los sprites según heading e IDs actuales.</summary>
         public void Refresh()
         {
-            SetLayerSprite(BodyRenderer,   IdBody,    EntityDatabase.Instance.Bodies);
+            SetLayerSprite(BodyRenderer,   _bodyOutline, IdBody,   EntityDatabase.Instance.Bodies);
             SetHeadSprite();
-            SetLayerSprite(HelmetRenderer, IdHelmet,  EntityDatabase.Instance.Helmets);
-            SetLayerSprite(WeaponRenderer, IdWeapon,  EntityDatabase.Instance.Weapons);
-            SetLayerSprite(ShieldRenderer, IdShield,  EntityDatabase.Instance.Shields);
+            SetLayerSprite(HelmetRenderer, null,         IdHelmet, EntityDatabase.Instance.Helmets);
+            SetLayerSprite(WeaponRenderer, null,         IdWeapon, EntityDatabase.Instance.Weapons);
+            SetLayerSprite(ShieldRenderer, null,         IdShield, EntityDatabase.Instance.Shields);
         }
 
-        private void SetLayerSprite(SpriteRenderer sr,
+        private void SetLayerSprite(SpriteRenderer sr, SpriteRenderer outline,
                                     int id,
                                     System.Collections.Generic.Dictionary<int, DirectionalGrh> db)
         {
             if (id <= 0 || !db.TryGetValue(id, out var dg))
             {
                 sr.sprite = null;
+                if (outline != null) outline.sprite = null;
                 return;
             }
 
             int grhIndex = EntityDatabase.GetGrhForHeading(dg, Heading);
-            if (grhIndex <= 0) { sr.sprite = null; return; }
+            if (grhIndex <= 0)
+            {
+                sr.sprite = null;
+                if (outline != null) outline.sprite = null;
+                return;
+            }
 
             GrhDatabase.Instance.GetSprite(grhIndex, sprite =>
             {
-                if (sr != null) sr.sprite = sprite;
+                if (sr      != null) sr.sprite      = sprite;
+                if (outline != null) outline.sprite = sprite;
             });
         }
 
@@ -178,22 +196,28 @@ namespace ArgentumOnline.Renderer
                 IdBody  <= 0 || !EntityDatabase.Instance.Bodies.TryGetValue(IdBody, out var bodyDg))
             {
                 HeadRenderer.sprite = null;
+                if (_headOutline != null) _headOutline.sprite = null;
                 return;
             }
 
             int grhIndex = EntityDatabase.GetGrhForHeading(headDg, Heading);
-            if (grhIndex <= 0) { HeadRenderer.sprite = null; return; }
+            if (grhIndex <= 0)
+            {
+                HeadRenderer.sprite = null;
+                if (_headOutline != null) _headOutline.sprite = null;
+                return;
+            }
 
-            // Offset de la cabeza relativo al body (en pixels → unidades Unity)
-            // Se suma CharYOffset porque la capa Head fue creada en y=0 local y el
-            // body está elevado ese mismo valor.
             float offsetX = bodyDg.HeadOffsetX / 32f;
             float offsetY = bodyDg.HeadOffsetY / 32f;
-            HeadRenderer.transform.localPosition = new Vector3(offsetX, CharYOffset + (-offsetY), 0);
+            var headPos = new Vector3(offsetX, CharYOffset + (-offsetY), 0);
+            HeadRenderer.transform.localPosition = headPos;
+            if (_headOutline != null) _headOutline.transform.localPosition = headPos;
 
             GrhDatabase.Instance.GetSprite(grhIndex, sprite =>
             {
-                if (HeadRenderer != null) HeadRenderer.sprite = sprite;
+                if (HeadRenderer  != null) HeadRenderer.sprite  = sprite;
+                if (_headOutline  != null) _headOutline.sprite  = sprite;
             });
         }
 
@@ -234,10 +258,12 @@ namespace ArgentumOnline.Renderer
                     && int.TryParse(frameStr, out int frameGrh))
                 {
                     int capturedGrh = frameGrh;
-                    SpriteRenderer capturedSr = BodyRenderer;
+                    SpriteRenderer capturedSr      = BodyRenderer;
+                    SpriteRenderer capturedOutline = _bodyOutline;
                     GrhDatabase.Instance.GetSprite(capturedGrh, sprite =>
                     {
-                        if (capturedSr != null && sprite != null) capturedSr.sprite = sprite;
+                        if (capturedSr      != null && sprite != null) capturedSr.sprite      = sprite;
+                        if (capturedOutline != null && sprite != null) capturedOutline.sprite = sprite;
                     });
                 }
 
