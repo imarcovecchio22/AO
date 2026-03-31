@@ -1,12 +1,12 @@
 using UnityEngine;
-using ArgentumOnline.Game;
 
 namespace ArgentumOnline.Renderer
 {
     /// <summary>
-    /// Sigue al jugador local. La cámara siempre está centrada en el MapRenderer.
-    /// El MapRenderer renderiza el viewport relativo a su posición (dx, dy desde centro),
-    /// así que la cámara solo necesita apuntar al centro del MapRenderer (0,0 local).
+    /// Controla el zoom ortográfico de la cámara principal.
+    /// orthographicSize = 4  →  8 tiles visible verticalmente (portrait)
+    ///                          ~14 tiles en landscape 16:9
+    /// Aumentar para ver más mapa; bajar para acercar la cámara.
     /// </summary>
     public class CameraController : MonoBehaviour
     {
@@ -14,39 +14,33 @@ namespace ArgentumOnline.Renderer
 
         [SerializeField] private Camera _cam;
 
+        // Ajustá este valor para cambiar el zoom:
+        // 3 = muy cerca   (bueno para móvil portrait)
+        // 4 = recomendado (similar al cliente web de referencia)
+        // 6 = más alejado
+        [SerializeField] private float orthographicSize = 4f;
+
+        private bool _applied = false;
+
         void Awake()
         {
             Instance = this;
             if (_cam == null) _cam = Camera.main;
+            Apply();
         }
 
-        void Start()
+        void Start()  => Apply();
+        void Update() { if (!_applied) Apply(); }
+
+        private void Apply()
         {
+            if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
+
+            _cam.orthographicSize = orthographicSize;
             _cam.transform.position = new Vector3(0, 0, -10);
-            _cam.clearFlags         = CameraClearFlags.SolidColor;
-            _cam.backgroundColor    = Color.black;
-
-            FitCameraToViewport();
-        }
-
-        // Tiles visibles (half-height en world units = tiles desde centro hasta borde).
-        // 6 → ~12 tiles verticales en portrait, ~21 horizontales en landscape 16:9.
-        // 4 → ~8 tiles en portrait,  ~14 en landscape. Bajar para acercar la cámara.
-        // Valor recomendado para móvil portrait: 4–5. Para desktop landscape: 5–6.
-        private const float DisplayHalfTiles = 5f;
-
-        /// <summary>
-        /// Ajusta orthographicSize para mostrar exactamente DisplayHalfTiles tiles
-        /// en la dirección vertical (portrait) o equivalente en landscape.
-        /// El mapa sigue renderizando viewportRadius tiles para no mostrar bordes vacíos.
-        /// </summary>
-        private void FitCameraToViewport()
-        {
-            float aspect = (float)Screen.width / Screen.height;
-
-            // En landscape (aspect > 1) escalar por el aspecto para que los tiles sigan siendo cuadrados
-            // y se mantenga la misma densidad visual que en portrait.
-            _cam.orthographicSize = DisplayHalfTiles / Mathf.Max(1f, aspect);
+            _cam.clearFlags      = CameraClearFlags.SolidColor;
+            _cam.backgroundColor = Color.black;
+            _applied = true;
         }
     }
 }
