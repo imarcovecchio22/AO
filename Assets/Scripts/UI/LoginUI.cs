@@ -20,15 +20,18 @@ namespace ArgentumOnline.UI
         public event System.Action<string, string, string> OnCharacterSelected;
         // accountId, characterId, email
 
-        // ── Colores ───────────────────────────────────────────────────────────
-        private static readonly Color BgColor     = new(0.06f, 0.06f, 0.10f, 0.97f);
-        private static readonly Color PanelColor  = new(0.09f, 0.09f, 0.14f, 1.00f);
-        private static readonly Color InputColor  = new(0.13f, 0.13f, 0.18f, 1.00f);
-        private static readonly Color BtnGreen    = new(0.18f, 0.65f, 0.30f, 1.00f);
-        private static readonly Color BtnBlue     = new(0.18f, 0.40f, 0.80f, 1.00f);
-        private static readonly Color ErrorColor  = new(1.00f, 0.35f, 0.35f, 1.00f);
-        private static readonly Color TextLight   = new(0.90f, 0.90f, 0.90f, 1.00f);
-        private static readonly Color TextMuted   = new(0.55f, 0.55f, 0.60f, 1.00f);
+        // ── Colores medievales ────────────────────────────────────────────────
+        private static readonly Color BgColor     = new(0.05f, 0.02f, 0.01f, 1.00f); // negro marrón oscuro
+        private static readonly Color PanelColor  = new(0.20f, 0.11f, 0.05f, 1.00f); // madera oscura
+        private static readonly Color PanelBorder = new(0.55f, 0.38f, 0.10f, 1.00f); // dorado envejecido
+        private static readonly Color InputColor  = new(0.10f, 0.06f, 0.03f, 1.00f); // cuero oscuro
+        private static readonly Color InputBorder = new(0.40f, 0.25f, 0.08f, 1.00f); // marrón cálido
+        private static readonly Color BtnGold     = new(0.62f, 0.42f, 0.08f, 1.00f); // dorado medieval
+        private static readonly Color BtnBrown    = new(0.38f, 0.20f, 0.07f, 1.00f); // marrón medio
+        private static readonly Color ErrorColor  = new(0.90f, 0.25f, 0.15f, 1.00f); // rojo sangre
+        private static readonly Color TextLight   = new(0.95f, 0.87f, 0.65f, 1.00f); // pergamino
+        private static readonly Color TextMuted   = new(0.62f, 0.48f, 0.28f, 1.00f); // oro apagado
+        private static readonly Color Separator   = new(0.55f, 0.38f, 0.10f, 0.70f); // línea decorativa
 
         // ── Refs ──────────────────────────────────────────────────────────────
         private Canvas     _canvas;
@@ -70,13 +73,13 @@ namespace ArgentumOnline.UI
             scaler.referenceResolution = new Vector2(1080, 1920);
             go.AddComponent<GraphicRaycaster>();
 
-            // Fondo completo oscuro
+            // Fondo completo marrón oscuro medieval
             var bg     = Rect("BG", go.transform);
             var bgRect = bg.GetComponent<RectTransform>();
             bgRect.anchorMin = Vector2.zero;
             bgRect.anchorMax = Vector2.one;
             bgRect.offsetMin = bgRect.offsetMax = Vector2.zero;
-            bg.AddComponent<Image>().color = new Color(0.02f, 0.02f, 0.04f, 1f);
+            bg.AddComponent<Image>().color = BgColor;
 
             _loginPanel = BuildLoginPanel(go.transform);
             _charPanel  = BuildCharPanel(go.transform);
@@ -87,82 +90,121 @@ namespace ArgentumOnline.UI
 
         private GameObject BuildLoginPanel(Transform parent)
         {
-            var panel     = Rect("LoginPanel", parent);
+            // Marco dorado exterior
+            var border     = Rect("LoginBorder", parent);
+            var borderRect = border.GetComponent<RectTransform>();
+            borderRect.anchorMin        = new Vector2(0.5f, 0.5f);
+            borderRect.anchorMax        = new Vector2(0.5f, 0.5f);
+            borderRect.pivot            = new Vector2(0.5f, 0.5f);
+            borderRect.anchoredPosition = Vector2.zero;
+            borderRect.sizeDelta        = new Vector2(376, 436);
+            border.AddComponent<Image>().color = PanelBorder;
+
+            var panel     = Rect("LoginPanel", border.transform);
             var panelRect = panel.GetComponent<RectTransform>();
             panelRect.anchorMin        = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax        = new Vector2(0.5f, 0.5f);
             panelRect.pivot            = new Vector2(0.5f, 0.5f);
             panelRect.anchoredPosition = Vector2.zero;
-            panelRect.sizeDelta        = new Vector2(360, 360);
+            panelRect.sizeDelta        = new Vector2(368, 428);
 
             panel.AddComponent<Image>().color = PanelColor;
             var sh = panel.AddComponent<Shadow>();
-            sh.effectColor    = new Color(0, 0, 0, 0.6f);
-            sh.effectDistance = new Vector2(4, -4);
+            sh.effectColor    = new Color(0, 0, 0, 0.80f);
+            sh.effectDistance = new Vector2(6, -6);
 
-            float y = 140f;
+            float y = 178f;
 
-            // Título
-            var title = MakeText("Title", panel.transform, "Argentum Online", 28, FontStyle.Bold, TextLight);
-            Place(title, new Vector2(0, y), new Vector2(320, 40));
+            // Título grande
+            var title = MakeText("Title", panel.transform, "Argentum Online", 32, FontStyle.Bold, TextLight);
+            Place(title, new Vector2(0, y), new Vector2(340, 46));
             title.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            var titleOutline = title.AddComponent<Outline>();
+            titleOutline.effectColor    = new Color(0.55f, 0.38f, 0.08f, 0.9f);
+            titleOutline.effectDistance = new Vector2(1.5f, -1.5f);
+            y -= 44f;
 
-            y -= 50f;
-            MakeText("SubLabel", panel.transform, "Iniciá sesión para jugar", 14, FontStyle.Normal, TextMuted)
-                .GetComponent<RectTransform>().anchoredPosition = new Vector2(0, y);
-            y -= 50f;
+            // Línea separadora decorativa
+            var sep = Rect("Separator", panel.transform);
+            Place(sep, new Vector2(0, y), new Vector2(300, 2));
+            sep.AddComponent<Image>().color = Separator;
+            y -= 18f;
+
+            // Subtítulo
+            var sub = MakeText("SubLabel", panel.transform, "~ Iniciá sesión para continuar ~", 13, FontStyle.Italic, TextMuted);
+            Place(sub, new Vector2(0, y), new Vector2(340, 22));
+            sub.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            y -= 46f;
 
             // Campo usuario
-            MakeLabel(panel.transform, "Usuario", new Vector2(-50f, y));
-            y -= 28f;
-            _userField = MakeInput(panel.transform, "usuario", false, new Vector2(0, y), new Vector2(320, 36));
-            y -= 50f;
+            MakeLabel(panel.transform, "Usuario", new Vector2(-54f, y));
+            y -= 30f;
+            _userField = MakeInput(panel.transform, "usuario", false, new Vector2(0, y), new Vector2(320, 38));
+            y -= 54f;
 
             // Campo contraseña
-            MakeLabel(panel.transform, "Contraseña", new Vector2(-80f, y));
-            y -= 28f;
-            _passField = MakeInput(panel.transform, "contraseña", true, new Vector2(0, y), new Vector2(320, 36));
-            y -= 50f;
+            MakeLabel(panel.transform, "Contraseña", new Vector2(-68f, y));
+            y -= 30f;
+            _passField = MakeInput(panel.transform, "contraseña", true, new Vector2(0, y), new Vector2(320, 38));
+            y -= 52f;
 
             // Error
             var errGo = MakeText("Error", panel.transform, "", 12, FontStyle.Normal, ErrorColor);
-            Place(errGo, new Vector2(0, y), new Vector2(320, 28));
+            Place(errGo, new Vector2(0, y), new Vector2(320, 26));
             errGo.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
             _errorText = errGo.GetComponent<Text>();
-            y -= 44f;
+            y -= 42f;
 
-            // Botón login
-            _loginBtn = MakeButton("LoginBtn", panel.transform, "Ingresar", BtnGreen,
-                new Vector2(0, y), new Vector2(320, 44));
+            // Botón login (dorado)
+            _loginBtn = MakeButton("LoginBtn", panel.transform, "⚔  Ingresar al Reino", BtnGold,
+                new Vector2(0, y), new Vector2(320, 46));
             _loginBtn.onClick.AddListener(OnLoginClicked);
 
-            return panel;
+            return border;
         }
 
         // ── Panel de Personajes ───────────────────────────────────────────────
 
         private GameObject BuildCharPanel(Transform parent)
         {
-            var panel     = Rect("CharPanel", parent);
+            // Marco dorado exterior
+            var border     = Rect("CharBorder", parent);
+            var borderRect = border.GetComponent<RectTransform>();
+            borderRect.anchorMin        = new Vector2(0.5f, 0.5f);
+            borderRect.anchorMax        = new Vector2(0.5f, 0.5f);
+            borderRect.pivot            = new Vector2(0.5f, 0.5f);
+            borderRect.anchoredPosition = Vector2.zero;
+            borderRect.sizeDelta        = new Vector2(396, 496);
+            border.AddComponent<Image>().color = PanelBorder;
+
+            var panel     = Rect("CharPanel", border.transform);
             var panelRect = panel.GetComponent<RectTransform>();
             panelRect.anchorMin        = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax        = new Vector2(0.5f, 0.5f);
             panelRect.pivot            = new Vector2(0.5f, 0.5f);
             panelRect.anchoredPosition = Vector2.zero;
-            panelRect.sizeDelta        = new Vector2(380, 480);
+            panelRect.sizeDelta        = new Vector2(388, 488);
 
             panel.AddComponent<Image>().color = PanelColor;
             var sh = panel.AddComponent<Shadow>();
-            sh.effectColor    = new Color(0, 0, 0, 0.6f);
-            sh.effectDistance = new Vector2(4, -4);
+            sh.effectColor    = new Color(0, 0, 0, 0.80f);
+            sh.effectDistance = new Vector2(6, -6);
 
-            var title = MakeText("Title", panel.transform, "Seleccionar personaje", 22, FontStyle.Bold, TextLight);
-            Place(title, new Vector2(0, 200f), new Vector2(340, 36));
+            var title = MakeText("Title", panel.transform, "Héroes del Reino", 24, FontStyle.Bold, TextLight);
+            Place(title, new Vector2(0, 208f), new Vector2(350, 38));
             title.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            var titleOutline = title.AddComponent<Outline>();
+            titleOutline.effectColor    = new Color(0.55f, 0.38f, 0.08f, 0.9f);
+            titleOutline.effectDistance = new Vector2(1.5f, -1.5f);
+
+            // Línea separadora decorativa
+            var sep = Rect("Separator", panel.transform);
+            Place(sep, new Vector2(0, 176f), new Vector2(310, 2));
+            sep.AddComponent<Image>().color = Separator;
 
             // Error de carga
             var errGo = MakeText("CharError", panel.transform, "", 12, FontStyle.Normal, ErrorColor);
-            Place(errGo, new Vector2(0, 165f), new Vector2(340, 24));
+            Place(errGo, new Vector2(0, 156f), new Vector2(350, 24));
             errGo.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
             _charErrorText = errGo.GetComponent<Text>();
 
@@ -173,7 +215,7 @@ namespace ArgentumOnline.UI
             listRect.anchorMax        = new Vector2(0.5f, 0.5f);
             listRect.pivot            = new Vector2(0.5f, 0.5f);
             listRect.anchoredPosition = new Vector2(0, -10f);
-            listRect.sizeDelta        = new Vector2(340, 300);
+            listRect.sizeDelta        = new Vector2(350, 290);
             var vlg = listGo.AddComponent<VerticalLayoutGroup>();
             vlg.spacing               = 10f;
             vlg.childForceExpandWidth = true;
@@ -184,15 +226,15 @@ namespace ArgentumOnline.UI
             _charList = listGo.transform;
 
             // Botón volver
-            var backBtn = MakeButton("BackBtn", panel.transform, "← Volver", BtnBlue,
-                new Vector2(0, -210f), new Vector2(160, 38));
+            var backBtn = MakeButton("BackBtn", panel.transform, "← Volver", BtnBrown,
+                new Vector2(0, -214f), new Vector2(160, 40));
             backBtn.onClick.AddListener(() =>
             {
                 _charPanel.SetActive(false);
                 _loginPanel.SetActive(true);
             });
 
-            return panel;
+            return border;
         }
 
         // ── Lógica ────────────────────────────────────────────────────────────
@@ -261,17 +303,20 @@ namespace ArgentumOnline.UI
 
                 var row     = Rect($"Char_{charName}", _charList);
                 var rowLE   = row.AddComponent<LayoutElement>();
-                rowLE.preferredHeight = 60f;
-                row.AddComponent<Image>().color = new Color(0.13f, 0.13f, 0.18f, 1f);
+                rowLE.preferredHeight = 64f;
+                row.AddComponent<Image>().color = new Color(0.14f, 0.08f, 0.04f, 1f);
+                var rowOutline = row.AddComponent<Outline>();
+                rowOutline.effectColor    = new Color(0.55f, 0.38f, 0.10f, 0.5f);
+                rowOutline.effectDistance = new Vector2(1f, -1f);
 
                 // Nombre
-                var nameGo = MakeText("Name", row.transform, charName, 16, FontStyle.Bold, TextLight);
-                Place(nameGo, new Vector2(-50f, 0), new Vector2(200, 60));
+                var nameGo = MakeText("Name", row.transform, charName, 17, FontStyle.Bold, TextLight);
+                Place(nameGo, new Vector2(-45f, 0), new Vector2(210, 64));
                 nameGo.GetComponent<Text>().alignment = TextAnchor.MiddleLeft;
 
                 // Botón jugar
-                var btn = MakeButton("PlayBtn", row.transform, "Jugar", BtnGreen,
-                    new Vector2(120f, 0), new Vector2(100, 40));
+                var btn = MakeButton("PlayBtn", row.transform, "Jugar", BtnGold,
+                    new Vector2(122f, 0), new Vector2(104, 42));
                 btn.onClick.AddListener(() =>
                 {
                     _canvas.gameObject.SetActive(false);
@@ -329,6 +374,9 @@ namespace ArgentumOnline.UI
             var go = Rect("InputGo", parent);
             Place(go, pos, size);
             go.AddComponent<Image>().color = InputColor;
+            var inputOutline = go.AddComponent<Outline>();
+            inputOutline.effectColor    = InputBorder;
+            inputOutline.effectDistance = new Vector2(1f, -1f);
             var field = go.AddComponent<InputField>();
             if (password) field.contentType = InputField.ContentType.Password;
 

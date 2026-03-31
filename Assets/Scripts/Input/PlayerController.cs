@@ -24,7 +24,13 @@ namespace ArgentumOnline.Input
         private bool  _moving       = false;
         private VirtualJoystick.JoyDir _heldDir = VirtualJoystick.JoyDir.None;
 
-        private bool _joystickSubscribed = false;
+        private bool      _joystickSubscribed = false;
+        private bool      _meditSubscribed    = false;
+        private Coroutine _manaRegenCoroutine;
+
+        // Cuánta mana regenerar por tick y cada cuántos segundos
+        private const ushort ManaRegenPerTick  = 3;
+        private const float  ManaRegenInterval = 1.5f;
 
         void Awake() => Instance = this;
 
@@ -32,6 +38,8 @@ namespace ArgentumOnline.Input
         {
             if (VirtualJoystick.Instance != null)
                 VirtualJoystick.Instance.OnDirectionChanged -= OnJoyDir;
+            var lp = GameState.Instance?.LocalPlayer;
+            if (lp != null) lp.OnMeditandoChanged -= OnMeditandoChanged;
         }
 
         // ── Joystick ──────────────────────────────────────────────────────────
@@ -68,11 +76,17 @@ namespace ArgentumOnline.Input
 
         void Update()
         {
-            // Suscribirse al joystick cuando esté disponible (se crea en runtime)
+            // Suscribirse al joystick y a eventos del jugador cuando estén disponibles
             if (!_joystickSubscribed && VirtualJoystick.Instance != null)
             {
                 VirtualJoystick.Instance.OnDirectionChanged += OnJoyDir;
                 _joystickSubscribed = true;
+            }
+            var lp = GameState.Instance?.LocalPlayer;
+            if (lp != null && !_meditSubscribed)
+            {
+                lp.OnMeditandoChanged += OnMeditandoChanged;
+                _meditSubscribed = true;
             }
 
             // Click/tap: siempre activo (independiente del joystick)
@@ -113,7 +127,7 @@ namespace ArgentumOnline.Input
             if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
             {
                 var screenPos = Mouse.current.position.ReadValue();
-                if (!IsBlockedByUI(screenPos)) SendMoveToAt(screenPos);
+                if (!IsBlockedByUI(screenPos) && GameState.Instance.LocalPlayer.Privileges == 1) SendMoveToAt(screenPos);
             }
 
             // Touch (móvil) → interacción
@@ -191,9 +205,47 @@ namespace ArgentumOnline.Input
 
         // ── Envío al servidor ─────────────────────────────────────────────────
 
+        // ── Meditación / regen de mana ────────────────────────────────────────
+
+        private void OnMeditandoChanged(bool meditando)
+        {
+            if (meditando)
+            {
+                if (_manaRegenCoroutine != null) StopCoroutine(_manaRegenCoroutine);
+                _manaRegenCoroutine = StartCoroutine(ManaRegenRoutine());
+            }
+            else
+            {
+                if (_manaRegenCoroutine != null)
+                {
+                    StopCoroutine(_manaRegenCoroutine);
+                    _manaRegenCoroutine = null;
+                }
+            }
+        }
+
+        private IEnumerator ManaRegenRoutine()
+        {
+            var wait = new WaitForSeconds(ManaRegenInterval);
+            while (true)
+            {
+                yield return wait;
+                var lp = GameState.Instance.LocalPlayer;
+                if (lp == null || !lp.Meditando) yield break;
+                if (lp.MaxMana > 0 && lp.Mana < lp.MaxMana)
+                {
+                    ushort newMana = (ushort)Mathf.Min(lp.Mana + ManaRegenPerTick, lp.MaxMana);
+                    lp.SetMana(newMana);
+                }
+            }
+        }
+
         private void SendMove(VirtualJoystick.JoyDir dir)
         {
             if (!NetworkManager.Instance.IsConnected) return;
+
+            // Cancelar meditación al moverse
+            GameState.Instance.LocalPlayer?.SetMeditando(false);
 
             _lastMoveSent = Time.time;
 

@@ -49,6 +49,7 @@ namespace ArgentumOnline.Game
         public bool ZonaSegura;
         public bool Navegando;
         public bool IsDead;
+        public bool Meditando;
 
         // ── Inventario (slots 0-20) ───────────────────────────────────────────
         public readonly InventorySlot[] Inventory = new InventorySlot[InventorySize];
@@ -62,6 +63,7 @@ namespace ArgentumOnline.Game
         public event Action OnSpellsChanged;
         public event Action OnPositionChanged;
         public event Action OnGoldChanged;
+        public event Action<bool> OnMeditandoChanged;
 
         public LocalPlayer()
         {
@@ -145,6 +147,15 @@ namespace ArgentumOnline.Game
             OnInventoryChanged?.Invoke();
         }
 
+        public void SwapSpells(int a, int b)
+        {
+            if (a < 0 || a >= SpellsSize || b < 0 || b >= SpellsSize) return;
+            var tmp   = Spells[a];
+            Spells[a] = Spells[b];
+            Spells[b] = tmp;
+            OnSpellsChanged?.Invoke();
+        }
+
         public void SetSpellSlot(byte idPos, ushort idSpell, string name, ushort manaRequired)
         {
             if (idPos >= SpellsSize) return;
@@ -154,6 +165,13 @@ namespace ArgentumOnline.Game
             slot.Name         = name;
             slot.ManaRequired = manaRequired;
             OnSpellsChanged?.Invoke();
+        }
+
+        public void SetMeditando(bool value)
+        {
+            if (Meditando == value) return;
+            Meditando = value;
+            OnMeditandoChanged?.Invoke(value);
         }
 
         public void NotifyStatsChanged()   => OnStatsChanged?.Invoke();

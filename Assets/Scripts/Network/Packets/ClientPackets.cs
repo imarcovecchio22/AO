@@ -22,6 +22,7 @@ namespace ArgentumOnline.Network
         SellItem         = 15,  // byte idPos, ushort cant
         MoveTo           = 16,  // byte x, byte y (teleport al tile clickeado)
         ChangeSeguro     = 17,  // (sin campos, toggle seguro PvP)
+        Meditar          = 18,  // (sin campos, toggle meditación)
     }
 
     /// <summary>

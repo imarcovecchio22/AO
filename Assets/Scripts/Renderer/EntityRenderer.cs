@@ -32,7 +32,8 @@ namespace ArgentumOnline.Renderer
             gs.OnDialogBubble  += OnDialogBubble;
 
             // Jugador local
-            gs.LocalPlayer.OnPositionChanged += RefreshLocalPlayer;
+            gs.LocalPlayer.OnPositionChanged   += RefreshLocalPlayer;
+            gs.LocalPlayer.OnMeditandoChanged  += OnMeditandoChanged;
             _prevPlayerTile = new Vector2(gs.LocalPlayer.PosX, gs.LocalPlayer.PosY);
 
             // Crear vista del jugador local
@@ -79,6 +80,21 @@ namespace ArgentumOnline.Renderer
             StartCoroutine(StopAnimAfterMove(_localPlayerView));
 
             RefreshAllPositions();
+        }
+
+        private void OnMeditandoChanged(bool meditando)
+        {
+            if (_localPlayerView == null) return;
+            if (meditando)
+            {
+                int level = GameState.Instance.LocalPlayer.Level;
+                int grh   = EntityView.MeditGrhForLevel(level);
+                _localPlayerView.StartMeditation(grh);
+            }
+            else
+            {
+                _localPlayerView.StopMeditation();
+            }
         }
 
         // ── Entidades remotas ─────────────────────────────────────────────────

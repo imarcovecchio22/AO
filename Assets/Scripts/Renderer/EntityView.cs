@@ -30,6 +30,10 @@ namespace ArgentumOnline.Renderer
         // Interpolación de movimiento
         private Coroutine _moveCoroutine;
 
+        // Meditación
+        private Coroutine  _meditCoroutine;
+        private GameObject _meditAura;
+
         // Estado actual
         public long   EntityId;
         public byte   Heading = 2;  // Down por defecto
@@ -222,6 +226,70 @@ namespace ArgentumOnline.Renderer
             HelmetRenderer.sortingOrder = yOrder + 2;
             WeaponRenderer.sortingOrder = yOrder + 3;
             ShieldRenderer.sortingOrder = yOrder + 4;
+        }
+
+        // ── Meditación ────────────────────────────────────────────────────────
+
+        // GRH de la animación amarilla de meditación (igual que AO original):
+        // 134 = CHICO (lv 1-14), 145 = MEDIANO (lv 15-29), 156 = GRANDE (lv 30-44), 286 = XGRANDE (lv 45+)
+        public const int MeditGrhChico   = 134;
+        public const int MeditGrhMediano = 145;
+        public const int MeditGrhGrande  = 156;
+        public const int MeditGrhXGrande = 286;
+
+        public static int MeditGrhForLevel(int level)
+        {
+            if (level >= 45) return MeditGrhXGrande;
+            if (level >= 30) return MeditGrhGrande;
+            if (level >= 15) return MeditGrhMediano;
+            return MeditGrhChico;
+        }
+
+        public void StartMeditation(int grhIndex = MeditGrhChico)
+        {
+            if (_meditCoroutine != null) return;
+            _meditCoroutine = StartCoroutine(MeditationRoutine(grhIndex));
+        }
+
+        public void StopMeditation()
+        {
+            if (_meditCoroutine != null) { StopCoroutine(_meditCoroutine); _meditCoroutine = null; }
+            if (_meditAura != null)      { Destroy(_meditAura);            _meditAura      = null; }
+        }
+
+        private IEnumerator MeditationRoutine(int grhIndex)
+        {
+            if (!GrhDatabase.Instance.TryGetGrh(grhIndex, out var grh) || grh.numFrames <= 1)
+                yield break;
+
+            _meditAura = new GameObject("MeditAura");
+            _meditAura.transform.SetParent(transform, false);
+            // Offset vertical igual al del AO original: y=0, centrado sobre el personaje
+            _meditAura.transform.localPosition = new Vector3(0, 0, 0.05f);
+
+            var sr = _meditAura.AddComponent<SpriteRenderer>();
+            sr.sortingOrder = BodyRenderer.sortingOrder + 10;  // encima del personaje
+
+            float frameSec = grh.speed > 0 ? grh.speed / 1000f : 0.085f;
+            int frame = 1;
+
+            while (true)
+            {
+                string key = frame.ToString();
+                if (grh.frames != null && grh.frames.TryGetValue(key, out string frameStr)
+                    && int.TryParse(frameStr, out int frameGrh))
+                {
+                    int captured = frameGrh;
+                    SpriteRenderer capturedSr = sr;
+                    GrhDatabase.Instance.GetSprite(captured, sprite =>
+                    {
+                        if (capturedSr != null) capturedSr.sprite = sprite;
+                    });
+                }
+
+                frame = (frame % grh.numFrames) + 1;
+                yield return new WaitForSeconds(frameSec);
+            }
         }
 
         // ── Burbuja de diálogo ────────────────────────────────────────────────

@@ -238,8 +238,41 @@ namespace ArgentumOnline.UI
         {
             string text = _inputField.text.Trim();
             CloseInput();
-            if (string.IsNullOrEmpty(text) || !NetworkManager.Instance.IsConnected) return;
+            if (string.IsNullOrEmpty(text)) return;
+
+            if (TryHandleCommand(text)) return;
+
+            if (!NetworkManager.Instance.IsConnected) return;
             NetworkManager.Instance.Send(PacketSerializer.Instance.Dialog(text));
+        }
+
+        private bool TryHandleCommand(string text)
+        {
+            if (!text.StartsWith("/")) return false;
+
+            string cmd = text.ToLowerInvariant();
+
+            if (cmd == "/meditar")
+            {
+                var lp = GameState.Instance.LocalPlayer;
+                if (lp == null) return true;
+                bool next = !lp.Meditando;
+                lp.SetMeditando(next);
+                if (NetworkManager.Instance.IsConnected)
+                    NetworkManager.Instance.Send(PacketSerializer.Instance.Meditar());
+                OnMessage(next ? "Comenzaste a meditar." : "Dejaste de meditar.", "#88aaff");
+                return true;
+            }
+
+            if (cmd == "/online")
+            {
+                if (NetworkManager.Instance.IsConnected)
+                    NetworkManager.Instance.Send(PacketSerializer.Instance.Dialog(text));
+                return true;
+            }
+
+            OnMessage($"Comando desconocido: {text}", "#ff6666");
+            return true;
         }
 
         // ── Helper ────────────────────────────────────────────────────────────

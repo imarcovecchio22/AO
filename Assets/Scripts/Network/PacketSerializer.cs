@@ -122,6 +122,9 @@ namespace ArgentumOnline.Network
                 .WriteByte(y)
                 .Build();
 
+        public byte[] Meditar()
+            => Start(ClientPacketID.Meditar).Build();
+
         public byte[] TirarItem(uint slotPos, ushort cantidad)
             => Start(ClientPacketID.TirarItem)
                 .WriteInt(slotPos)

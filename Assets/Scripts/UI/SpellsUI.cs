@@ -197,6 +197,22 @@ namespace ArgentumOnline.UI
             scrollRect.content  = contentRt;
             scrollRect.viewport = scrollRt;
 
+            // ── Botones ▲/▼ a la derecha del panel ───────────────────────────
+            const float BtnW = 28f;
+            const float BtnH = 40f;
+
+            var orderBar = MakeRect("OrderBar", _panel.transform);
+            var orderRt  = orderBar.GetComponent<RectTransform>();
+            orderRt.anchorMin        = new Vector2(1f, 0.5f);
+            orderRt.anchorMax        = new Vector2(1f, 0.5f);
+            orderRt.pivot            = new Vector2(0f, 0.5f);
+            orderRt.anchoredPosition = new Vector2(4f, 0f);
+            orderRt.sizeDelta        = new Vector2(BtnW, BtnH * 2 + 4f);
+            orderBar.AddComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.80f);
+
+            BuildSideBtn("BtnUp", orderBar.transform, "▲", new Vector2(0,  BtnH / 2f + 2f), () => MoveSpell(-1));
+            BuildSideBtn("BtnDn", orderBar.transform, "▼", new Vector2(0, -(BtnH / 2f + 2f)), () => MoveSpell(+1));
+
             // Pre-poblar filas (28 hechizos máximo)
             _rowBgs   = new Image[LocalPlayer.SpellsSize];
             _rowNames = new Text[LocalPlayer.SpellsSize];
@@ -247,7 +263,7 @@ namespace ArgentumOnline.UI
                 nameTxt.alignment = TextAnchor.MiddleLeft;
                 _rowNames[i] = nameTxt;
 
-                // Coste de maná (derecha)
+                // Coste de maná
                 var manaGo = MakeRect("Mana", row.transform);
                 var manaRt = manaGo.GetComponent<RectTransform>();
                 manaRt.anchorMin        = new Vector2(1, 0);
@@ -336,6 +352,55 @@ namespace ArgentumOnline.UI
             SelectedSpellSlot = -1;
             for (int i = 0; i < LocalPlayer.SpellsSize; i++)
                 UpdateRowColor(i);
+        }
+
+        // ── Reordenamiento ────────────────────────────────────────────────────
+
+        private void BuildSideBtn(string name, Transform parent, string label,
+                                   Vector2 pos, System.Action onClick)
+        {
+            var go = MakeRect(name, parent);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin        = new Vector2(0.5f, 0.5f);
+            rt.anchorMax        = new Vector2(0.5f, 0.5f);
+            rt.pivot            = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = pos;
+            rt.sizeDelta        = new Vector2(26f, 38f);
+            go.AddComponent<Image>().color = new Color(0.18f, 0.18f, 0.18f, 0.90f);
+            var btn    = go.AddComponent<Button>();
+            var colors = btn.colors;
+            colors.highlightedColor = new Color(0.40f, 0.35f, 0.10f, 1f);
+            colors.pressedColor     = new Color(0.60f, 0.50f, 0.10f, 1f);
+            btn.colors = colors;
+            btn.onClick.AddListener(() => onClick());
+
+            var lblGo = MakeRect("L", go.transform);
+            lblGo.GetComponent<RectTransform>().anchorMin = Vector2.zero;
+            lblGo.GetComponent<RectTransform>().anchorMax = Vector2.one;
+            var txt = lblGo.AddComponent<Text>();
+            txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.text      = label;
+            txt.fontSize  = 16;
+            txt.fontStyle = FontStyle.Bold;
+            txt.color     = ColGold;
+            txt.alignment = TextAnchor.MiddleCenter;
+        }
+
+        private void MoveSpell(int direction)
+        {
+            if (SelectedSpellSlot < 0) return;
+
+            var spells = GameState.Instance.LocalPlayer.Spells;
+            int target = SelectedSpellSlot + direction;
+
+            while (target >= 0 && target < LocalPlayer.SpellsSize && spells[target].IsEmpty)
+                target += direction;
+
+            if (target < 0 || target >= LocalPlayer.SpellsSize) return;
+
+            int from = SelectedSpellSlot;
+            SelectedSpellSlot = target;  // primero, para que Refresh() pinte la fila correcta
+            GameState.Instance.LocalPlayer.SwapSpells(from, target);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────

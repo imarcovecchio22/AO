@@ -33,7 +33,7 @@ namespace ArgentumOnline.UI
 
         void OnDestroy()
         {
-            GameState.Instance.OnConnected     -= Subscribe;
+            GameState.Instance.OnConnected      -= Subscribe;
             GameState.Instance.OnMapNameChanged -= OnMapName;
             if (GameState.Instance.LocalPlayer != null)
             {
@@ -44,8 +44,9 @@ namespace ArgentumOnline.UI
 
         private void Subscribe()
         {
-            GameState.Instance.LocalPlayer.OnStatsChanged    += Refresh;
-            GameState.Instance.LocalPlayer.OnPositionChanged += RefreshCoords;
+            var lp = GameState.Instance.LocalPlayer;
+            lp.OnStatsChanged    += Refresh;
+            lp.OnPositionChanged += RefreshCoords;
             Refresh();
             RefreshCoords();
         }
