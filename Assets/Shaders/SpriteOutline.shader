@@ -1,6 +1,6 @@
-// Shader URP para sprites 2D con contorno (outline) de 1 texel.
-// Compatible con Unity 6 / URP 17+.
-// Aplica dos pasadas: primero dibuja el outline, luego el sprite encima.
+// Sprite outline para Unity 6 / URP.
+// Usa CG (no HLSL con CBUFFER) para que SpriteRenderer pueda setear
+// _MainTex y _Color via MaterialPropertyBlock correctamente.
 Shader "Custom/SpriteOutline"
 {
     Properties
@@ -15,9 +15,8 @@ Shader "Custom/SpriteOutline"
     {
         Tags
         {
-            "RenderType"      = "Transparent"
             "Queue"           = "Transparent"
-            "RenderPipeline"  = "UniversalPipeline"
+            "RenderType"      = "Transparent"
             "IgnoreProjector" = "True"
             "PreviewType"     = "Plane"
         }
@@ -31,66 +30,56 @@ Shader "Custom/SpriteOutline"
         {
             Name "Outline"
 
-            HLSLPROGRAM
-            #pragma vertex   VertOutline
-            #pragma fragment FragOutline
+            CGPROGRAM
+            #pragma vertex   vert
+            #pragma fragment frag
+            #include "UnityCG.cginc"
 
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            sampler2D _MainTex;
+            float4    _MainTex_ST;
+            float4    _MainTex_TexelSize;
+            fixed4    _OutlineColor;
+            float     _OutlineSize;
 
-            TEXTURE2D(_MainTex);
-            SAMPLER(sampler_MainTex);
-
-            CBUFFER_START(UnityPerMaterial)
-                float4 _MainTex_ST;
-                float4 _MainTex_TexelSize;  // (.xy=1/wh, .zw=wh)
-                half4  _OutlineColor;
-                float  _OutlineSize;
-            CBUFFER_END
-
-            struct Attributes
+            struct appdata
             {
-                float4 positionOS : POSITION;
-                float2 uv         : TEXCOORD0;
-                UNITY_VERTEX_INPUT_INSTANCE_ID
+                float4 vertex : POSITION;
+                float2 uv     : TEXCOORD0;
             };
 
-            struct Varyings
+            struct v2f
             {
-                float4 positionHCS : SV_POSITION;
-                float2 uv          : TEXCOORD0;
-                UNITY_VERTEX_OUTPUT_STEREO
+                float4 vertex : SV_POSITION;
+                float2 uv     : TEXCOORD0;
             };
 
-            Varyings VertOutline(Attributes IN)
+            v2f vert(appdata v)
             {
-                Varyings OUT;
-                UNITY_SETUP_INSTANCE_ID(IN);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
-                OUT.positionHCS = TransformObjectToHClip(IN.positionOS.xyz);
-                OUT.uv = TRANSFORM_TEX(IN.uv, _MainTex);
-                return OUT;
+                v2f o;
+                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.uv     = TRANSFORM_TEX(v.uv, _MainTex);
+                return o;
             }
 
-            half4 FragOutline(Varyings IN) : SV_Target
+            fixed4 frag(v2f i) : SV_Target
             {
                 float2 ts = _MainTex_TexelSize.xy * _OutlineSize;
 
-                // Muestrear los 4 vecinos cardinales
-                float a = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv + float2( ts.x,  0   )).a
-                        + SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv + float2(-ts.x,  0   )).a
-                        + SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv + float2( 0,     ts.y)).a
-                        + SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv + float2( 0,    -ts.y)).a;
+                float a = tex2D(_MainTex, i.uv + float2( ts.x,  0   )).a
+                        + tex2D(_MainTex, i.uv + float2(-ts.x,  0   )).a
+                        + tex2D(_MainTex, i.uv + float2( 0,     ts.y)).a
+                        + tex2D(_MainTex, i.uv + float2( 0,    -ts.y)).a;
                 a = saturate(a);
 
-                // Sólo dibujar donde el propio sprite es transparente
-                float selfA = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv).a;
+                // No dibujar donde el propio sprite es opaco
+                float selfA = tex2D(_MainTex, i.uv).a;
                 a *= (1.0 - selfA);
 
-                half4 col = _OutlineColor;
+                fixed4 col = _OutlineColor;
                 col.a *= a;
                 return col;
             }
-            ENDHLSL
+            ENDCG
         }
 
         // ── Pasada 2: sprite normal ───────────────────────────────────────────
@@ -98,52 +87,43 @@ Shader "Custom/SpriteOutline"
         {
             Name "Sprite"
 
-            HLSLPROGRAM
-            #pragma vertex   VertSprite
-            #pragma fragment FragSprite
+            CGPROGRAM
+            #pragma vertex   vert
+            #pragma fragment frag
+            #include "UnityCG.cginc"
 
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            sampler2D _MainTex;
+            float4    _MainTex_ST;
+            fixed4    _Color;
 
-            TEXTURE2D(_MainTex);
-            SAMPLER(sampler_MainTex);
-
-            CBUFFER_START(UnityPerMaterial)
-                float4 _MainTex_ST;
-                half4  _Color;
-            CBUFFER_END
-
-            struct Attributes
+            struct appdata
             {
-                float4 positionOS : POSITION;
-                float2 uv         : TEXCOORD0;
-                float4 color      : COLOR;
-                UNITY_VERTEX_INPUT_INSTANCE_ID
+                float4 vertex : POSITION;
+                float4 color  : COLOR;
+                float2 uv     : TEXCOORD0;
             };
 
-            struct Varyings
+            struct v2f
             {
-                float4 positionHCS : SV_POSITION;
-                float2 uv          : TEXCOORD0;
-                half4  color       : COLOR;
-                UNITY_VERTEX_OUTPUT_STEREO
+                float4 vertex : SV_POSITION;
+                fixed4 color  : COLOR;
+                float2 uv     : TEXCOORD0;
             };
 
-            Varyings VertSprite(Attributes IN)
+            v2f vert(appdata v)
             {
-                Varyings OUT;
-                UNITY_SETUP_INSTANCE_ID(IN);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
-                OUT.positionHCS = TransformObjectToHClip(IN.positionOS.xyz);
-                OUT.uv    = TRANSFORM_TEX(IN.uv, _MainTex);
-                OUT.color = IN.color * _Color;
-                return OUT;
+                v2f o;
+                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.uv     = TRANSFORM_TEX(v.uv, _MainTex);
+                o.color  = v.color * _Color;
+                return o;
             }
 
-            half4 FragSprite(Varyings IN) : SV_Target
+            fixed4 frag(v2f i) : SV_Target
             {
-                return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv) * IN.color;
+                return tex2D(_MainTex, i.uv) * i.color;
             }
-            ENDHLSL
+            ENDCG
         }
     }
 
