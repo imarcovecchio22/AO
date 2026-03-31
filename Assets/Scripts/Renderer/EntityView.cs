@@ -41,6 +41,12 @@ namespace ArgentumOnline.Renderer
 
         private static int _sortBase = 100;  // sortingOrder base para entidades
 
+        // Los sprites de body son ~25x45px a 32PPU → ~1.4u de alto.
+        // Offset vertical para que los pies queden al nivel del tile (y=0).
+        private const float CharYOffset = 0.7f;   // ≈ mitad de la altura típica del body
+
+        private static Sprite _shadowSprite;
+
         public static EntityView Create(long entityId, string entityName, Transform parent)
         {
             var go = new GameObject($"Entity_{entityId}");
@@ -49,17 +55,20 @@ namespace ArgentumOnline.Renderer
             var view = go.AddComponent<EntityView>();
             view.EntityId = entityId;
 
-            // Body — capa base
-            view.BodyRenderer   = CreateLayer(go, "Body",   0);
-            view.HeadRenderer   = CreateLayer(go, "Head",   1);
-            view.HelmetRenderer = CreateLayer(go, "Helmet", 2);
-            view.WeaponRenderer = CreateLayer(go, "Weapon", 3);
-            view.ShieldRenderer = CreateLayer(go, "Shield", 4);
+            // Sombra elíptica al nivel del suelo (antes que los demás layers)
+            view.AddShadow(go);
 
-            // Nombre
+            // Capas del personaje elevadas para que los pies toquen el suelo
+            view.BodyRenderer   = CreateLayer(go, "Body",   0, CharYOffset);
+            view.HeadRenderer   = CreateLayer(go, "Head",   1, CharYOffset);
+            view.HelmetRenderer = CreateLayer(go, "Helmet", 2, CharYOffset);
+            view.WeaponRenderer = CreateLayer(go, "Weapon", 3, CharYOffset);
+            view.ShieldRenderer = CreateLayer(go, "Shield", 4, CharYOffset);
+
+            // Nombre flotante — encima del personaje
             var labelGo = new GameObject("Label");
             labelGo.transform.SetParent(go.transform);
-            labelGo.transform.localPosition = new Vector3(0, 0.8f, 0);
+            labelGo.transform.localPosition = new Vector3(0, CharYOffset + 1.2f, 0);
             var tm = labelGo.AddComponent<TextMesh>();
             tm.text          = entityName;
             tm.fontSize      = 10;
@@ -72,11 +81,48 @@ namespace ArgentumOnline.Renderer
             return view;
         }
 
-        private static SpriteRenderer CreateLayer(GameObject parent, string name, int layerOffset)
+        private void AddShadow(GameObject parent)
+        {
+            if (_shadowSprite == null)
+                _shadowSprite = BuildShadowSprite();
+
+            var shadowGo = new GameObject("Shadow");
+            shadowGo.transform.SetParent(parent.transform);
+            shadowGo.transform.localPosition  = new Vector3(0, 0.05f, 0);
+            shadowGo.transform.localScale      = new Vector3(0.7f, 0.35f, 1f);  // elipse
+            var sr = shadowGo.AddComponent<SpriteRenderer>();
+            sr.sprite       = _shadowSprite;
+            sr.color        = new Color(0, 0, 0, 0.35f);
+            sr.sortingOrder = _sortBase - 1;
+        }
+
+        private static Sprite BuildShadowSprite()
+        {
+            int size = 32;
+            var tex  = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            float r = size / 2f;
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x + 0.5f - r, dy = y + 0.5f - r;
+                float d  = Mathf.Sqrt(dx * dx + dy * dy);
+                float a  = Mathf.Clamp01(1f - d / r);
+                a = a * a;
+                pixels[y * size + x] = new Color(1, 1, 1, a);
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        }
+
+        private static SpriteRenderer CreateLayer(GameObject parent, string name,
+                                                   int layerOffset, float yOffset = 0f)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent.transform);
-            go.transform.localPosition = Vector3.zero;
+            go.transform.localPosition = new Vector3(0, yOffset, 0);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sortingOrder = _sortBase + layerOffset;
             return sr;
@@ -124,9 +170,11 @@ namespace ArgentumOnline.Renderer
             if (grhIndex <= 0) { HeadRenderer.sprite = null; return; }
 
             // Offset de la cabeza relativo al body (en pixels → unidades Unity)
+            // Se suma CharYOffset porque la capa Head fue creada en y=0 local y el
+            // body está elevado ese mismo valor.
             float offsetX = bodyDg.HeadOffsetX / 32f;
             float offsetY = bodyDg.HeadOffsetY / 32f;
-            HeadRenderer.transform.localPosition = new Vector3(offsetX, -offsetY, 0);
+            HeadRenderer.transform.localPosition = new Vector3(offsetX, CharYOffset + (-offsetY), 0);
 
             GrhDatabase.Instance.GetSprite(grhIndex, sprite =>
             {
@@ -221,6 +269,15 @@ namespace ArgentumOnline.Renderer
         private void ApplySortOrder(int dy)
         {
             int yOrder = _sortBase + (50 - dy);
+
+            // Actualizar sombra si existe
+            var shadowT = transform.Find("Shadow");
+            if (shadowT != null)
+            {
+                var shadowSr = shadowT.GetComponent<SpriteRenderer>();
+                if (shadowSr != null) shadowSr.sortingOrder = yOrder - 1;
+            }
+
             BodyRenderer.sortingOrder   = yOrder;
             HeadRenderer.sortingOrder   = yOrder + 1;
             HelmetRenderer.sortingOrder = yOrder + 2;
