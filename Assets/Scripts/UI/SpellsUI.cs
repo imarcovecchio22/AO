@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using ArgentumOnline.Game;
 
 namespace ArgentumOnline.UI
@@ -91,7 +92,7 @@ namespace ArgentumOnline.UI
             panelImg.raycastTarget = true;
             _panel.AddComponent<Outline>().effectColor = new Color(0.30f, 0.30f, 0.30f, 0.5f);
 
-            // Header "HECHIZOS"
+            // Header "HECHIZOS" — también sirve como drag handle
             var header   = MakeRect("Header", _panel.transform);
             var headerRt = header.GetComponent<RectTransform>();
             headerRt.anchorMin        = new Vector2(0, 1);
@@ -101,10 +102,32 @@ namespace ArgentumOnline.UI
             headerRt.sizeDelta        = new Vector2(0, HeaderH);
             header.AddComponent<Image>().color = new Color(0.10f, 0.10f, 0.10f, 0.80f);
 
+            // Ícono de drag (izquierda del header)
+            var dragIconGo = MakeRect("DragIcon", header.transform);
+            var dragIconRt = dragIconGo.GetComponent<RectTransform>();
+            dragIconRt.anchorMin        = new Vector2(0, 0.5f);
+            dragIconRt.anchorMax        = new Vector2(0, 0.5f);
+            dragIconRt.pivot            = new Vector2(0, 0.5f);
+            dragIconRt.anchoredPosition = new Vector2(6f, 0f);
+            dragIconRt.sizeDelta        = new Vector2(20f, 0f);
+            var dragTxt = dragIconGo.AddComponent<Text>();
+            dragTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            dragTxt.text      = "⠿";
+            dragTxt.fontSize  = 18;
+            dragTxt.color     = new Color(0.55f, 0.55f, 0.55f, 0.9f);
+            dragTxt.alignment = TextAnchor.MiddleCenter;
+            dragIconGo.GetComponent<RectTransform>().sizeDelta = new Vector2(20f, HeaderH);
+
+            // Componente de arrastre — adjunto al header, mueve el panel
+            var drag = header.AddComponent<PanelDragHandler>();
+            drag.PanelRt = _panelRt;
+            drag.SaveKey = "SpellsUI_Panel";
+
             var title   = MakeRect("Title", header.transform);
             var titleRt = title.GetComponent<RectTransform>();
             titleRt.anchorMin = Vector2.zero;
             titleRt.anchorMax = Vector2.one;
+            titleRt.offsetMin = new Vector2(28f, 0f);   // deja espacio al drag icon
             titleRt.offsetMax = new Vector2(-44f, 0f);
             var titleTxt = title.AddComponent<Text>();
             titleTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -411,6 +434,78 @@ namespace ArgentumOnline.UI
             go.transform.SetParent(parent, false);
             go.AddComponent<RectTransform>();
             return go;
+        }
+    }
+
+    /// <summary>
+    /// Permite arrastrar el panel al que apunta PanelRt.
+    /// Guarda/restaura la posición en PlayerPrefs.
+    /// </summary>
+    public class PanelDragHandler : MonoBehaviour,
+        IBeginDragHandler, IDragHandler, IEndDragHandler
+    {
+        public RectTransform PanelRt;
+        public string        SaveKey = "Panel";
+
+        private Vector2       _startAnchoredPos;
+        private Vector2       _startPointerLocal;
+        private RectTransform _canvasRt;
+        private Canvas        _canvas;
+
+        void Start()
+        {
+            _canvas   = PanelRt.GetComponentInParent<Canvas>();
+            _canvasRt = _canvas.GetComponent<RectTransform>();
+
+            // Restaurar posición guardada
+            if (PlayerPrefs.HasKey(SaveKey + "_x"))
+            {
+                float x = PlayerPrefs.GetFloat(SaveKey + "_x");
+                float y = PlayerPrefs.GetFloat(SaveKey + "_y");
+                PanelRt.anchoredPosition = new Vector2(x, y);
+                ClampToScreen();
+            }
+        }
+
+        public void OnBeginDrag(PointerEventData e)
+        {
+            _startAnchoredPos = PanelRt.anchoredPosition;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _canvasRt, e.position, null, out _startPointerLocal);
+        }
+
+        public void OnDrag(PointerEventData e)
+        {
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _canvasRt, e.position, null, out var currentLocal);
+            PanelRt.anchoredPosition = _startAnchoredPos + (currentLocal - _startPointerLocal);
+            ClampToScreen();
+        }
+
+        public void OnEndDrag(PointerEventData e)
+        {
+            PlayerPrefs.SetFloat(SaveKey + "_x", PanelRt.anchoredPosition.x);
+            PlayerPrefs.SetFloat(SaveKey + "_y", PanelRt.anchoredPosition.y);
+            PlayerPrefs.Save();
+        }
+
+        // Mantiene el panel dentro de los límites de la pantalla.
+        // GetWorldCorners en ScreenSpaceOverlay devuelve coordenadas en pixels de pantalla.
+        private void ClampToScreen()
+        {
+            var corners = new Vector3[4];
+            PanelRt.GetWorldCorners(corners);
+            // 0=bottomLeft  1=topLeft  2=topRight  3=bottomRight
+            float sf = _canvas.scaleFactor;
+
+            Vector2 adj = Vector2.zero;
+            if (corners[0].x < 0)             adj.x =  -corners[0].x;
+            if (corners[2].x > Screen.width)  adj.x = Screen.width  - corners[2].x;
+            if (corners[0].y < 0)             adj.y =  -corners[0].y;
+            if (corners[1].y > Screen.height) adj.y = Screen.height - corners[1].y;
+
+            if (adj != Vector2.zero)
+                PanelRt.anchoredPosition += adj / sf;
         }
     }
 }
