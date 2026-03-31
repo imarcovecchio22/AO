@@ -20,7 +20,13 @@ namespace ArgentumOnline.Renderer
 
         private Vector2 _prevPlayerTile;
 
-        void Awake() => Instance = this;
+        void Awake()
+        {
+            Instance = this;
+            // Post-processing global (bloom, color grading, vignette)
+            if (PostProcessSetup.Instance == null)
+                gameObject.AddComponent<PostProcessSetup>();
+        }
 
         public void Initialize()
         {

@@ -45,7 +45,8 @@ namespace ArgentumOnline.Renderer
         // Offset vertical para que los pies queden al nivel del tile (y=0).
         private const float CharYOffset = 0.7f;   // ≈ mitad de la altura típica del body
 
-        private static Sprite _shadowSprite;
+        private static Sprite   _shadowSprite;
+        private static Material _outlineMat;   // compartido entre todas las entidades
 
         public static EntityView Create(long entityId, string entityName, Transform parent)
         {
@@ -55,15 +56,27 @@ namespace ArgentumOnline.Renderer
             var view = go.AddComponent<EntityView>();
             view.EntityId = entityId;
 
+            // Material de outline (creado una sola vez, compartido entre entidades)
+            if (_outlineMat == null)
+            {
+                var shader = Shader.Find("Custom/SpriteOutline");
+                if (shader != null)
+                {
+                    _outlineMat = new Material(shader);
+                    _outlineMat.SetColor("_OutlineColor", new Color(0f, 0f, 0f, 0.80f));
+                    _outlineMat.SetFloat("_OutlineSize",  1f);
+                }
+            }
+
             // Sombra elíptica al nivel del suelo (antes que los demás layers)
             view.AddShadow(go);
 
             // Capas del personaje elevadas para que los pies toquen el suelo
-            view.BodyRenderer   = CreateLayer(go, "Body",   0, CharYOffset);
-            view.HeadRenderer   = CreateLayer(go, "Head",   1, CharYOffset);
-            view.HelmetRenderer = CreateLayer(go, "Helmet", 2, CharYOffset);
-            view.WeaponRenderer = CreateLayer(go, "Weapon", 3, CharYOffset);
-            view.ShieldRenderer = CreateLayer(go, "Shield", 4, CharYOffset);
+            view.BodyRenderer   = CreateLayer(go, "Body",   0, CharYOffset, _outlineMat);
+            view.HeadRenderer   = CreateLayer(go, "Head",   1, CharYOffset, _outlineMat);
+            view.HelmetRenderer = CreateLayer(go, "Helmet", 2, CharYOffset, _outlineMat);
+            view.WeaponRenderer = CreateLayer(go, "Weapon", 3, CharYOffset, _outlineMat);
+            view.ShieldRenderer = CreateLayer(go, "Shield", 4, CharYOffset, _outlineMat);
 
             // Nombre flotante — encima del personaje
             var labelGo = new GameObject("Label");
@@ -118,13 +131,15 @@ namespace ArgentumOnline.Renderer
         }
 
         private static SpriteRenderer CreateLayer(GameObject parent, string name,
-                                                   int layerOffset, float yOffset = 0f)
+                                                   int layerOffset, float yOffset = 0f,
+                                                   Material mat = null)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent.transform);
             go.transform.localPosition = new Vector3(0, yOffset, 0);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sortingOrder = _sortBase + layerOffset;
+            if (mat != null) sr.sharedMaterial = mat;
             return sr;
         }
 
