@@ -68,7 +68,7 @@ namespace ArgentumOnline.Renderer
             // Nombre flotante — encima del personaje
             var labelGo = new GameObject("Label");
             labelGo.transform.SetParent(go.transform);
-            labelGo.transform.localPosition = new Vector3(0, CharYOffset + 1.2f, 0);
+            labelGo.transform.localPosition = new Vector3(0, CharYOffset + 0.7f, 0);
             var tm = labelGo.AddComponent<TextMesh>();
             tm.text          = entityName;
             tm.fontSize      = 10;

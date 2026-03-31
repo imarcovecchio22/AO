@@ -29,22 +29,24 @@ namespace ArgentumOnline.Renderer
             FitCameraToViewport();
         }
 
+        // Tiles visibles (half-height en world units = tiles desde centro hasta borde).
+        // 6 → ~12 tiles verticales en portrait, ~21 horizontales en landscape 16:9.
+        // 4 → ~8 tiles en portrait,  ~14 en landscape. Bajar para acercar la cámara.
+        // Valor recomendado para móvil portrait: 4–5. Para desktop landscape: 5–6.
+        private const float DisplayHalfTiles = 5f;
+
         /// <summary>
-        /// Ajusta orthographicSize para que el viewport de tiles llene toda la pantalla.
-        /// El lado más largo de la pantalla determina cuántos tiles se necesitan.
+        /// Ajusta orthographicSize para mostrar exactamente DisplayHalfTiles tiles
+        /// en la dirección vertical (portrait) o equivalente en landscape.
+        /// El mapa sigue renderizando viewportRadius tiles para no mostrar bordes vacíos.
         /// </summary>
         private void FitCameraToViewport()
         {
-            int   radius = MapRenderer.Instance != null ? MapRenderer.Instance.ViewportRadius : 9;
             float aspect = (float)Screen.width / Screen.height;
 
-            // Necesitamos que 'radius' tiles lleguen hasta el borde en la dirección más ancha.
-            // orthographicSize = half-height en world units.
-            // half-width = orthographicSize * aspect
-            // Queremos max(half-height, half-width) <= radius + 0.5  →  tiles llenen pantalla.
-            // En portrait (aspect < 1) la altura manda: orthographicSize = radius + 0.5
-            // En landscape (aspect > 1) el ancho manda: orthographicSize = (radius + 0.5) / aspect
-            _cam.orthographicSize = (radius + 0.5f) / Mathf.Max(1f, aspect);
+            // En landscape (aspect > 1) escalar por el aspecto para que los tiles sigan siendo cuadrados
+            // y se mantenga la misma densidad visual que en portrait.
+            _cam.orthographicSize = DisplayHalfTiles / Mathf.Max(1f, aspect);
         }
     }
 }
