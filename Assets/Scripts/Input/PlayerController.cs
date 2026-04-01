@@ -192,9 +192,10 @@ namespace ArgentumOnline.Input
             var spellsUI = ArgentumOnline.UI.SpellsUI.Instance;
             if (spellsUI != null && spellsUI.SelectedSpellSlot >= 0)
             {
+                var slot = GameState.Instance.LocalPlayer.Spells[spellsUI.SelectedSpellSlot];
                 NetworkManager.Instance.Send(
                     PacketSerializer.Instance.AttackSpell(
-                        (byte)spellsUI.SelectedSpellSlot,
+                        slot.IdPos,
                         (byte)absX, (byte)absY));
                 spellsUI.ClearSelection();
                 return;

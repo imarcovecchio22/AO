@@ -8,7 +8,7 @@ namespace ArgentumOnline.UI
     /// <summary>
     /// Panel lateral derecho con los hechizos del jugador.
     /// Tap en un hechizo lo selecciona; el siguiente click en el mundo lo lanza.
-    /// Altura dinámica según cantidad de hechizos; scrollbar visible si hay muchos.
+    /// Soporta minimizar/maximizar y arrastre libre.
     /// </summary>
     public class SpellsUI : MonoBehaviour
     {
@@ -20,7 +20,13 @@ namespace ArgentumOnline.UI
         private RectTransform _panelRt;
         private GameObject    _panel;
         private Transform     _listContent;
+        private GameObject    _scrollGo;
+        private GameObject    _scrollbarGo;
+        private GameObject    _orderBarGo;
+        private ScrollRect    _scrollRect;
+        private RectTransform _scrollHandleRt;
         private bool          _isOpen;
+        private bool          _minimized;
 
         // Colores
         private static readonly Color BgPanel    = new Color(0.05f, 0.05f, 0.05f, 0.55f);
@@ -35,21 +41,43 @@ namespace ArgentumOnline.UI
         private const float RowGap    = 3f;
         private const float PadX      = 8f;
         private const float HeaderH   = 44f;
-        private const float PadBot    = 8f;
-        private const float MaxPanelH = 700f;   // altura máxima antes de activar scroll
-        private const float SbW       = 8f;     // ancho del scrollbar
-        private const float TopOffset = 200f;   // distancia desde top-right (debajo del minimapa)
+        private const float PadBot    = 30f;  // espacio para la barra ▲/▼ en el pie
+        private const float MaxPanelH = 500f;
+        private const float SbW       = 10f;
+        private const float TopOffset = 200f;
 
         // Referencias por fila
         private Image[] _rowBgs;
         private Text[]  _rowNames;
         private Text[]  _rowManas;
+        private Text    _minBtnTxt;
 
         void Awake() => Instance = this;
+
+        void Update()
+        {
+            if (!_isOpen || _minimized || _scrollRect == null || _scrollHandleRt == null) return;
+            float content  = _scrollRect.content.rect.height;
+            float viewport = ((RectTransform)_scrollRect.transform).rect.height;
+            if (content <= viewport || content <= 0f)
+            {
+                _scrollHandleRt.gameObject.SetActive(false);
+                return;
+            }
+            _scrollHandleRt.gameObject.SetActive(true);
+            float ratio  = Mathf.Clamp01(viewport / content);
+            float nPos   = _scrollRect.normalizedPosition.y;          // 1=top, 0=bottom
+            float bot    = nPos * (1f - ratio);
+            _scrollHandleRt.anchorMin = new Vector2(0f, bot);
+            _scrollHandleRt.anchorMax = new Vector2(1f, bot + ratio);
+            _scrollHandleRt.offsetMin = Vector2.zero;
+            _scrollHandleRt.offsetMax = Vector2.zero;
+        }
 
         void Start()
         {
             BuildUI();
+            _minimized = false;  // siempre expandido al inicio
             GameState.Instance.OnConnected += OnConnected;
         }
 
@@ -73,8 +101,9 @@ namespace ArgentumOnline.UI
             canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 18;
             var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode        = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1080, 1920);
+            scaler.matchWidthOrHeight  = 0.5f;
             canvasGo.AddComponent<GraphicRaycaster>();
             DontDestroyOnLoad(canvasGo);
 
@@ -85,14 +114,14 @@ namespace ArgentumOnline.UI
             _panelRt.anchorMax        = new Vector2(1f, 1f);
             _panelRt.pivot            = new Vector2(1f, 1f);
             _panelRt.anchoredPosition = new Vector2(-8f, -TopOffset);
-            _panelRt.sizeDelta        = new Vector2(PanelW, MaxPanelH);
+            _panelRt.sizeDelta        = new Vector2(PanelW, HeaderH);
 
             var panelImg = _panel.AddComponent<Image>();
             panelImg.color = BgPanel;
             panelImg.raycastTarget = true;
             _panel.AddComponent<Outline>().effectColor = new Color(0.30f, 0.30f, 0.30f, 0.5f);
 
-            // Header "HECHIZOS" — también sirve como drag handle
+            // Header
             var header   = MakeRect("Header", _panel.transform);
             var headerRt = header.GetComponent<RectTransform>();
             headerRt.anchorMin        = new Vector2(0, 1);
@@ -102,33 +131,32 @@ namespace ArgentumOnline.UI
             headerRt.sizeDelta        = new Vector2(0, HeaderH);
             header.AddComponent<Image>().color = new Color(0.10f, 0.10f, 0.10f, 0.80f);
 
-            // Ícono de drag (izquierda del header)
+            // Ícono de drag
             var dragIconGo = MakeRect("DragIcon", header.transform);
             var dragIconRt = dragIconGo.GetComponent<RectTransform>();
             dragIconRt.anchorMin        = new Vector2(0, 0.5f);
             dragIconRt.anchorMax        = new Vector2(0, 0.5f);
             dragIconRt.pivot            = new Vector2(0, 0.5f);
             dragIconRt.anchoredPosition = new Vector2(6f, 0f);
-            dragIconRt.sizeDelta        = new Vector2(20f, 0f);
+            dragIconRt.sizeDelta        = new Vector2(20f, HeaderH);
             var dragTxt = dragIconGo.AddComponent<Text>();
             dragTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             dragTxt.text      = "⠿";
             dragTxt.fontSize  = 18;
             dragTxt.color     = new Color(0.55f, 0.55f, 0.55f, 0.9f);
             dragTxt.alignment = TextAnchor.MiddleCenter;
-            dragIconGo.GetComponent<RectTransform>().sizeDelta = new Vector2(20f, HeaderH);
 
-            // Componente de arrastre — adjunto al header, mueve el panel
             var drag = header.AddComponent<PanelDragHandler>();
             drag.PanelRt = _panelRt;
             drag.SaveKey = "SpellsUI_Panel";
 
+            // Título
             var title   = MakeRect("Title", header.transform);
             var titleRt = title.GetComponent<RectTransform>();
             titleRt.anchorMin = Vector2.zero;
             titleRt.anchorMax = Vector2.one;
-            titleRt.offsetMin = new Vector2(28f, 0f);   // deja espacio al drag icon
-            titleRt.offsetMax = new Vector2(-44f, 0f);
+            titleRt.offsetMin = new Vector2(28f, 0f);
+            titleRt.offsetMax = new Vector2(-84f, 0f);
             var titleTxt = title.AddComponent<Text>();
             titleTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             titleTxt.text      = "HECHIZOS";
@@ -137,14 +165,35 @@ namespace ArgentumOnline.UI
             titleTxt.color     = ColGold;
             titleTxt.alignment = TextAnchor.MiddleCenter;
 
+            // Botón minimizar
+            var minGo  = MakeRect("Minimize", header.transform);
+            var minRt  = minGo.GetComponent<RectTransform>();
+            minRt.anchorMin        = new Vector2(1, 0.5f);
+            minRt.anchorMax        = new Vector2(1, 0.5f);
+            minRt.pivot            = new Vector2(1, 0.5f);
+            minRt.anchoredPosition = new Vector2(-46f, 0f);
+            minRt.sizeDelta        = new Vector2(32f, 32f);
+            minGo.AddComponent<Image>().color = new Color(0.20f, 0.20f, 0.20f, 0.95f);
+            minGo.AddComponent<Button>().onClick.AddListener(ToggleMinimize);
+            var minLabel = MakeRect("L", minGo.transform);
+            minLabel.GetComponent<RectTransform>().anchorMin = Vector2.zero;
+            minLabel.GetComponent<RectTransform>().anchorMax = Vector2.one;
+            _minBtnTxt = minLabel.AddComponent<Text>();
+            _minBtnTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _minBtnTxt.text      = "−";
+            _minBtnTxt.fontSize  = 18;
+            _minBtnTxt.fontStyle = FontStyle.Bold;
+            _minBtnTxt.color     = ColWhite;
+            _minBtnTxt.alignment = TextAnchor.MiddleCenter;
+
             // Botón cerrar
             var closeGo  = MakeRect("Close", header.transform);
             var closeRt  = closeGo.GetComponent<RectTransform>();
             closeRt.anchorMin        = new Vector2(1, 0.5f);
             closeRt.anchorMax        = new Vector2(1, 0.5f);
             closeRt.pivot            = new Vector2(1, 0.5f);
-            closeRt.anchoredPosition = new Vector2(-6f, 0f);
-            closeRt.sizeDelta        = new Vector2(36f, 36f);
+            closeRt.anchoredPosition = new Vector2(-8f, 0f);
+            closeRt.sizeDelta        = new Vector2(32f, 32f);
             closeGo.AddComponent<Image>().color = new Color(0.85f, 0.15f, 0.15f, 0.95f);
             closeGo.AddComponent<Button>().onClick.AddListener(Close);
             var ct = MakeRect("X", closeGo.transform);
@@ -152,52 +201,48 @@ namespace ArgentumOnline.UI
             ct.GetComponent<RectTransform>().anchorMax = Vector2.one;
             var ctTxt = ct.AddComponent<Text>();
             ctTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            ctTxt.text = "✕"; ctTxt.fontSize = 16; ctTxt.fontStyle = FontStyle.Bold;
+            ctTxt.text = "✕"; ctTxt.fontSize = 15; ctTxt.fontStyle = FontStyle.Bold;
             ctTxt.color = ColWhite; ctTxt.alignment = TextAnchor.MiddleCenter;
 
-            // Scrollbar (derecha del área de scroll)
-            var sbGo = MakeRect("Scrollbar", _panel.transform);
-            var sbRt = sbGo.GetComponent<RectTransform>();
+            // Indicador de scroll custom (sin componente Scrollbar — ancho garantizado = SbW)
+            _scrollbarGo = MakeRect("ScrollIndicator", _panel.transform);
+            var sbRt = _scrollbarGo.GetComponent<RectTransform>();
             sbRt.anchorMin = new Vector2(1, 0);
             sbRt.anchorMax = new Vector2(1, 1);
             sbRt.pivot     = new Vector2(1, 0.5f);
             sbRt.offsetMin = new Vector2(-SbW, PadBot);
             sbRt.offsetMax = new Vector2(0f, -HeaderH);
-            sbGo.AddComponent<Image>().color = new Color(0.12f, 0.12f, 0.12f, 0.85f);
-            var sb = sbGo.AddComponent<Scrollbar>();
-            sb.direction = Scrollbar.Direction.BottomToTop;
+            var trackImg = _scrollbarGo.AddComponent<Image>();
+            trackImg.color = new Color(0.08f, 0.08f, 0.08f, 0.40f);
+            trackImg.raycastTarget = false;
 
-            var slidingArea = MakeRect("SlidingArea", sbGo.transform);
-            var saRt = slidingArea.GetComponent<RectTransform>();
-            saRt.anchorMin = Vector2.zero;
-            saRt.anchorMax = Vector2.one;
-            saRt.offsetMin = new Vector2(1f, 2f);
-            saRt.offsetMax = new Vector2(-1f, -2f);
+            var handleGo  = MakeRect("Handle", _scrollbarGo.transform);
+            var handleImg = handleGo.AddComponent<Image>();
+            handleImg.color = new Color(0.65f, 0.65f, 0.65f, 0.90f);
+            handleImg.raycastTarget = false;
+            _scrollHandleRt = handleGo.GetComponent<RectTransform>();
+            _scrollHandleRt.anchorMin = new Vector2(0, 0.8f);
+            _scrollHandleRt.anchorMax = new Vector2(1, 1f);
+            _scrollHandleRt.offsetMin = Vector2.zero;
+            _scrollHandleRt.offsetMax = Vector2.zero;
 
-            var handle    = MakeRect("Handle", slidingArea.transform);
-            var handleImg = handle.AddComponent<Image>();
-            handleImg.color = new Color(0.55f, 0.55f, 0.55f, 0.90f);
-            sb.handleRect     = handle.GetComponent<RectTransform>();
-            sb.targetGraphic  = handleImg;
-
-            // ScrollRect (viewport)
-            var scrollGo = MakeRect("Scroll", _panel.transform);
-            var scrollRt = scrollGo.GetComponent<RectTransform>();
+            // ScrollRect
+            _scrollGo = MakeRect("Scroll", _panel.transform);
+            var scrollRt = _scrollGo.GetComponent<RectTransform>();
             scrollRt.anchorMin = new Vector2(0, 0);
             scrollRt.anchorMax = new Vector2(1, 1);
             scrollRt.offsetMin = new Vector2(PadX, PadBot);
             scrollRt.offsetMax = new Vector2(-(SbW + 2f), -HeaderH);
 
-            scrollGo.AddComponent<RectMask2D>();
-            var scrollRect = scrollGo.AddComponent<ScrollRect>();
-            scrollRect.horizontal            = false;
-            scrollRect.vertical              = true;
-            scrollRect.scrollSensitivity     = 40f;
-            scrollRect.verticalScrollbar     = sb;
-            scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+            _scrollGo.AddComponent<RectMask2D>();
+            var scrollRect = _scrollGo.AddComponent<ScrollRect>();
+            scrollRect.horizontal        = false;
+            scrollRect.vertical          = true;
+            scrollRect.scrollSensitivity = 40f;
+            _scrollRect = scrollRect;
 
-            // Content con VerticalLayoutGroup + ContentSizeFitter
-            var contentGo = MakeRect("Content", scrollGo.transform);
+            // Content
+            var contentGo = MakeRect("Content", _scrollGo.transform);
             _listContent  = contentGo.transform;
             var contentRt = contentGo.GetComponent<RectTransform>();
             contentRt.anchorMin = new Vector2(0, 1);
@@ -220,21 +265,20 @@ namespace ArgentumOnline.UI
             scrollRect.content  = contentRt;
             scrollRect.viewport = scrollRt;
 
-            // ── Botones ▲/▼ a la derecha del panel ───────────────────────────
-            const float BtnW = 28f;
-            const float BtnH = 40f;
+            // Botones ▲/▼ en el pie del panel (dentro, no afuera)
+            const float FootH = 26f;
 
-            var orderBar = MakeRect("OrderBar", _panel.transform);
-            var orderRt  = orderBar.GetComponent<RectTransform>();
-            orderRt.anchorMin        = new Vector2(1f, 0.5f);
-            orderRt.anchorMax        = new Vector2(1f, 0.5f);
-            orderRt.pivot            = new Vector2(0f, 0.5f);
-            orderRt.anchoredPosition = new Vector2(4f, 0f);
-            orderRt.sizeDelta        = new Vector2(BtnW, BtnH * 2 + 4f);
-            orderBar.AddComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.80f);
+            _orderBarGo = MakeRect("OrderBar", _panel.transform);
+            var orderRt  = _orderBarGo.GetComponent<RectTransform>();
+            orderRt.anchorMin = new Vector2(0, 0);
+            orderRt.anchorMax = new Vector2(1, 0);
+            orderRt.pivot     = new Vector2(0.5f, 0);
+            orderRt.offsetMin = new Vector2(0, 0);
+            orderRt.offsetMax = new Vector2(0, FootH);
+            _orderBarGo.AddComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.80f);
 
-            BuildSideBtn("BtnUp", orderBar.transform, "▲", new Vector2(0,  BtnH / 2f + 2f), () => MoveSpell(-1));
-            BuildSideBtn("BtnDn", orderBar.transform, "▼", new Vector2(0, -(BtnH / 2f + 2f)), () => MoveSpell(+1));
+            BuildFootBtn("BtnUp", _orderBarGo.transform, "▲", new Vector2(-22f, 0), () => MoveSpell(-1));
+            BuildFootBtn("BtnDn", _orderBarGo.transform, "▼", new Vector2( 22f, 0), () => MoveSpell(+1));
 
             // Pre-poblar filas (28 hechizos máximo)
             _rowBgs   = new Image[LocalPlayer.SpellsSize];
@@ -257,7 +301,7 @@ namespace ArgentumOnline.UI
                 rowBtn.targetGraphic = rowImg;
                 rowBtn.onClick.AddListener(() => OnSpellClick(capturedI));
 
-                // Número de slot (izquierda)
+                // Número de slot
                 var numGo = MakeRect("Num", row.transform);
                 var numRt = numGo.GetComponent<RectTransform>();
                 numRt.anchorMin        = new Vector2(0, 0);
@@ -278,7 +322,7 @@ namespace ArgentumOnline.UI
                 nameRt.anchorMin = new Vector2(0, 0);
                 nameRt.anchorMax = new Vector2(1, 1);
                 nameRt.offsetMin = new Vector2(30f, 0f);
-                nameRt.offsetMax = new Vector2(-58f, 0f);
+                nameRt.offsetMax = new Vector2(-44f, 0f);
                 var nameTxt = nameGo.AddComponent<Text>();
                 nameTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 nameTxt.fontSize  = 14;
@@ -292,8 +336,8 @@ namespace ArgentumOnline.UI
                 manaRt.anchorMin        = new Vector2(1, 0);
                 manaRt.anchorMax        = new Vector2(1, 1);
                 manaRt.pivot            = new Vector2(1, 0.5f);
-                manaRt.anchoredPosition = new Vector2(-6f, 0f);
-                manaRt.sizeDelta        = new Vector2(54f, 0f);
+                manaRt.anchoredPosition = new Vector2(-4f, 0f);
+                manaRt.sizeDelta        = new Vector2(38f, 0f);
                 var manaTxt = manaGo.AddComponent<Text>();
                 manaTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 manaTxt.fontSize  = 12;
@@ -314,14 +358,54 @@ namespace ArgentumOnline.UI
         public void Open()
         {
             _isOpen = true;
-            Refresh();
             _panel.SetActive(true);
+            ApplyMinimizeState();
+            if (!_minimized) Refresh();
         }
 
         public void Close()
         {
             _isOpen = false;
             _panel.SetActive(false);
+        }
+
+        private void ToggleMinimize()
+        {
+            _minimized = !_minimized;
+            PlayerPrefs.SetInt("SpellsUI_Minimized", _minimized ? 1 : 0);
+            PlayerPrefs.Save();
+            ApplyMinimizeState();
+            if (!_minimized && _isOpen) Refresh();
+        }
+
+        private void ApplyMinimizeState()
+        {
+            _scrollGo.SetActive(!_minimized);
+            _scrollbarGo.SetActive(!_minimized);
+            _orderBarGo.SetActive(!_minimized);
+            _minBtnTxt.text = _minimized ? "□" : "−";
+
+            if (_minimized)
+            {
+                _panelRt.sizeDelta = new Vector2(PanelW, HeaderH);
+            }
+            else
+            {
+                RefreshPanelHeight();
+            }
+        }
+
+        private void RefreshPanelHeight()
+        {
+            if (GameState.Instance?.LocalPlayer == null) return;
+            var spells = GameState.Instance.LocalPlayer.Spells;
+            int activeCount = 0;
+            for (int i = 0; i < LocalPlayer.SpellsSize; i++)
+                if (!spells[i].IsEmpty) activeCount++;
+
+            float contentH = activeCount * RowH + Mathf.Max(0, activeCount - 1) * RowGap + 8f;
+            float panelH   = Mathf.Clamp(HeaderH + contentH + PadBot, HeaderH + RowH + PadBot, MaxPanelH);
+            _panelRt.sizeDelta = new Vector2(PanelW, panelH);
         }
 
         private void Refresh()
@@ -345,19 +429,19 @@ namespace ArgentumOnline.UI
                 activeCount++;
             }
 
-            // Ajustar altura del panel al contenido (capped a MaxPanelH)
-            float contentH = activeCount * RowH + Mathf.Max(0, activeCount - 1) * RowGap + 8f;
-            float panelH   = Mathf.Clamp(HeaderH + contentH + PadBot, HeaderH + RowH + PadBot, MaxPanelH);
-            _panelRt.sizeDelta = new Vector2(PanelW, panelH);
+            if (!_minimized)
+            {
+                float contentH = activeCount * RowH + Mathf.Max(0, activeCount - 1) * RowGap + 8f;
+                float panelH   = Mathf.Clamp(HeaderH + contentH + PadBot, HeaderH + RowH + PadBot, MaxPanelH);
+                _panelRt.sizeDelta = new Vector2(PanelW, panelH);
+            }
         }
 
         private void OnSpellClick(int slotIndex)
         {
             var spell = GameState.Instance.LocalPlayer.Spells[slotIndex];
             if (spell.IsEmpty) return;
-
             SelectedSpellSlot = (SelectedSpellSlot == slotIndex) ? -1 : slotIndex;
-
             for (int i = 0; i < LocalPlayer.SpellsSize; i++)
                 UpdateRowColor(i);
         }
@@ -369,7 +453,6 @@ namespace ArgentumOnline.UI
             _rowBgs[i].color = (i == SelectedSpellSlot) ? BgSelected : BgRow;
         }
 
-        /// <summary>Llamado por PlayerController tras lanzar el hechizo.</summary>
         public void ClearSelection()
         {
             SelectedSpellSlot = -1;
@@ -379,16 +462,16 @@ namespace ArgentumOnline.UI
 
         // ── Reordenamiento ────────────────────────────────────────────────────
 
-        private void BuildSideBtn(string name, Transform parent, string label,
-                                   Vector2 pos, System.Action onClick)
+        private void BuildFootBtn(string name, Transform parent, string label,
+                                   Vector2 offset, System.Action onClick)
         {
             var go = MakeRect(name, parent);
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin        = new Vector2(0.5f, 0.5f);
             rt.anchorMax        = new Vector2(0.5f, 0.5f);
             rt.pivot            = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = pos;
-            rt.sizeDelta        = new Vector2(26f, 38f);
+            rt.anchoredPosition = offset;
+            rt.sizeDelta        = new Vector2(36f, 22f);
             go.AddComponent<Image>().color = new Color(0.18f, 0.18f, 0.18f, 0.90f);
             var btn    = go.AddComponent<Button>();
             var colors = btn.colors;
@@ -403,7 +486,7 @@ namespace ArgentumOnline.UI
             var txt = lblGo.AddComponent<Text>();
             txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             txt.text      = label;
-            txt.fontSize  = 16;
+            txt.fontSize  = 13;
             txt.fontStyle = FontStyle.Bold;
             txt.color     = ColGold;
             txt.alignment = TextAnchor.MiddleCenter;
@@ -412,7 +495,6 @@ namespace ArgentumOnline.UI
         private void MoveSpell(int direction)
         {
             if (SelectedSpellSlot < 0) return;
-
             var spells = GameState.Instance.LocalPlayer.Spells;
             int target = SelectedSpellSlot + direction;
 
@@ -422,7 +504,7 @@ namespace ArgentumOnline.UI
             if (target < 0 || target >= LocalPlayer.SpellsSize) return;
 
             int from = SelectedSpellSlot;
-            SelectedSpellSlot = target;  // primero, para que Refresh() pinte la fila correcta
+            SelectedSpellSlot = target;
             GameState.Instance.LocalPlayer.SwapSpells(from, target);
         }
 
@@ -438,8 +520,7 @@ namespace ArgentumOnline.UI
     }
 
     /// <summary>
-    /// Permite arrastrar el panel al que apunta PanelRt.
-    /// Guarda/restaura la posición en PlayerPrefs.
+    /// Permite arrastrar el panel. Guarda/restaura posición en PlayerPrefs.
     /// </summary>
     public class PanelDragHandler : MonoBehaviour,
         IBeginDragHandler, IDragHandler, IEndDragHandler
@@ -457,7 +538,6 @@ namespace ArgentumOnline.UI
             _canvas   = PanelRt.GetComponentInParent<Canvas>();
             _canvasRt = _canvas.GetComponent<RectTransform>();
 
-            // Restaurar posición guardada
             if (PlayerPrefs.HasKey(SaveKey + "_x"))
             {
                 float x = PlayerPrefs.GetFloat(SaveKey + "_x");
@@ -489,13 +569,10 @@ namespace ArgentumOnline.UI
             PlayerPrefs.Save();
         }
 
-        // Mantiene el panel dentro de los límites de la pantalla.
-        // GetWorldCorners en ScreenSpaceOverlay devuelve coordenadas en pixels de pantalla.
         private void ClampToScreen()
         {
             var corners = new Vector3[4];
             PanelRt.GetWorldCorners(corners);
-            // 0=bottomLeft  1=topLeft  2=topRight  3=bottomRight
             float sf = _canvas.scaleFactor;
 
             Vector2 adj = Vector2.zero;
